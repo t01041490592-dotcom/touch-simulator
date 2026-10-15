@@ -1,0 +1,2906 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>터치 시뮬레이터</title>
+<style>
+  :root{
+    --bg:#0a0e14; --bg2:#0f1a1a; --card:#121a22ee; --text:#e8fdf2; --sub:#6f8b86;
+    --accent:#39ff9e; --accent2:#0fae6c; --gold:#ffcf4d; --line:#1e2d2a;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing:border-box;
+  }
+  html{ scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#eef6f1; --bg2:#dff3ea; --card:#ffffffee; --text:#0e2019; --sub:#4d685f;
+      --accent:#0fae6c; --accent2:#0a8a54; --gold:#b9860a; --line:#cfe6da;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0e14; --bg2:#0f1a1a; --card:#121a22ee; --text:#e8fdf2; --sub:#6f8b86;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+  button, .tab, .subBtn, .qtyBtn{ outline:none; }
+  button:focus, button:focus-visible{ outline:none; }
+  ::selection{ background:transparent; }
+  html,body{height:100%;}
+  body{
+    margin:0; color:var(--text); overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,monospace;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 38px, color-mix(in srgb, var(--accent) 4%, transparent) 39px),
+      repeating-linear-gradient(90deg, transparent, transparent 38px, color-mix(in srgb, var(--accent) 4%, transparent) 39px),
+      linear-gradient(160deg, var(--bg), var(--bg2));
+    height:100%; width:100%;
+    display:flex; align-items:center; justify-content:center;
+    padding:6px;
+  }
+
+  .stage{
+    position:relative;
+    width:100%; height:100%; max-width:1200px; max-height:760px;
+    display:flex; flex-direction:column; gap:10px; align-items:stretch;
+  }
+
+  .left{
+    flex:1.4; position:relative; border-radius:16px; overflow:hidden;
+    background:var(--card); border:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center;
+    padding:10px; min-height:0;
+  }
+  .left::before{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 30%);
+  }
+  .topPanel{
+    width:100%; flex:0 0 auto; display:flex; flex-direction:column; gap:4px;
+  }
+  .hud{
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; row-gap:4px;
+    font-size:.62rem; letter-spacing:1px; color:var(--sub); font-weight:700;
+  }
+  .lvBadge{
+    display:flex; align-items:center; gap:5px; background:color-mix(in srgb, var(--accent) 14%, var(--card));
+    border:1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius:8px; padding:3px 8px; color:var(--accent);
+    flex:0 0 auto; white-space:nowrap;
+  }
+  .muteBtn{
+    background:none; border:1px solid var(--line); color:var(--sub);
+    border-radius:6px; font-size:.68rem; padding:2px 5px; cursor:pointer; line-height:1;
+  }
+  .titleTag{ color:var(--accent); white-space:nowrap; }
+  .menuIconBtn.on{
+    background:color-mix(in srgb,#ff4d4d 22%,var(--card)); border-color:#ff4d4d; color:#ff8a8a;
+  }
+  .hudSkinRow{
+    width:100%; display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    background:var(--card); border:1px solid var(--line); border-radius:8px;
+    padding:4px 8px;
+  }
+  .hudSkinRow::before{ content:"스킨"; font-size:.6rem; color:var(--sub); font-weight:700; flex:0 0 auto; margin-right:2px; }
+  .hudSkinDot{
+    position:relative; width:17px; height:17px; border-radius:50%; flex:0 0 auto;
+    border:1px solid var(--line); cursor:pointer;
+  }
+  .hudSkinDot.locked{ cursor:default; filter:grayscale(1) brightness(.55); }
+  .hudSkinDot.equipped{ border-color:#fff; box-shadow:0 0 0 2px var(--gold); }
+  .hudSkinDot .lockIcon{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.45rem; }
+  .xpBar{
+    height:5px; border-radius:3px; background:var(--line); overflow:hidden;
+  }
+  .xpFill{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .3s ease; }
+
+  .missionBox{
+    flex:0 0 auto; display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:2px; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:7px 10px;
+  }
+  .missionBox .missionText{ grid-column:1; grid-row:1; }
+  .missionBox .missionReward{ grid-column:1; grid-row:2; }
+  .missionBox .missionLifetime{ grid-column:1; grid-row:3; }
+  .missionBox .missionClaim{ grid-column:2; grid-row:1 / span 3; align-self:center; }
+  .missionBox .missionBarBg{ grid-column:1 / -1; grid-row:4; margin-top:3px; }
+  .missionBox.skinMilestone{ opacity:.9; }
+  .missionBox.missionSpecial{
+    position:relative; border:1px solid transparent;
+    background-image:linear-gradient(var(--card),var(--card)), linear-gradient(90deg,#ff4d4d,#ffb238,#ffe14d,#4affa1,#4ea1ff,#b26bff,#ff4d4d);
+    background-origin:border-box; background-clip:padding-box, border-box;
+    background-size:100% 100%, 300% 100%;
+    animation:mythicShift 3s linear infinite;
+    box-shadow:0 0 8px rgba(255,255,255,.18);
+  }
+  .missionBox.missionWeekly{ position:relative; border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
+  .missionWeeklyTag{
+    position:absolute; top:-9px; left:10px; font-size:.56rem; font-weight:800; color:var(--bg);
+    background:var(--accent); padding:2px 8px; border-radius:8px;
+  }
+  .missionSpecialTag{
+    position:absolute; top:-9px; left:10px; font-size:.56rem; font-weight:800; color:#2a1c00;
+    background:linear-gradient(90deg,#ffe14d,#ffb238); padding:2px 8px; border-radius:8px;
+  }
+  .missionBox.skinMilestone.unlocked{ border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+  .missionText{ font-size:.7rem; color:var(--text); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .missionReward{ font-size:.62rem; color:var(--gold); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .missionLifetime{ font-size:.56rem; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .missionBarBg{ width:100%; height:5px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .missionBarFill{ height:100%; width:0%; background:linear-gradient(90deg,#ffb238,var(--gold)); transition:width .3s ease; }
+  .missionClaim{
+    align-self:flex-end; border:none; border-radius:7px; padding:5px 14px; font-size:.66rem; font-weight:800;
+    background:var(--line); color:var(--sub); cursor:pointer;
+  }
+  .missionClaim.ready{ background:var(--gold); color:#2a1c00; }
+  .missionClaim.claimed{ background:var(--line); color:var(--sub); cursor:default; opacity:.6; }
+  #missionTab{ flex-direction:column; gap:8px; overflow-x:hidden; overflow-y:auto; padding-top:10px; }
+
+  #shopTab{ flex-direction:column; gap:5px; overflow-x:hidden; overflow-y:auto; }
+  #shopTab .item{
+    flex:0 0 auto; flex-direction:row; align-items:center; justify-content:space-between; gap:10px;
+    padding:7px 10px; border-radius:10px;
+  }
+  #shopTab .item .info{ min-width:0; flex:1; }
+  #shopTab .item .name{ font-size:.76rem; }
+  #shopTab .item .desc{ font-size:.62rem; margin-top:1px; line-height:1.3; }
+  #shopTab .item button{ align-self:center; min-width:82px; padding:7px 8px; font-size:.7rem; }
+  #shopTab .item.canBuy{ border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
+  #shopTab .item.maxed{ opacity:.6; }
+  .shopHead{
+    flex:0 0 auto; position:sticky; top:0; z-index:2; margin-top:4px;
+    font-size:.66rem; font-weight:800; color:var(--accent); letter-spacing:.5px;
+    background:var(--bg2); padding:3px 4px; border-bottom:1px solid var(--line);
+  }
+  .skinRow{ display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; border-bottom:1px solid var(--line); margin-bottom:6px; }
+  .skinItem{
+    flex:0 0 170px; height:128px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:5px;
+    background:var(--card); border-radius:10px; padding:9px 8px; font-size:.62rem;
+    opacity:.35; border:1px solid var(--line);
+  }
+  .skinItem.done{ opacity:1; border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+  .skinItem.equipped{ border-color:var(--gold); box-shadow:0 0 10px color-mix(in srgb, var(--gold) 30%, transparent); }
+  #skinTab{ overflow-y:auto; align-items:flex-start; }
+  .skinItem > *{ flex-shrink:0; }
+  .skinItem .swatch{ flex:0 0 auto; width:28px; height:28px; border-radius:50%; }
+  .skinItem .skinName{ color:var(--accent); font-weight:800; text-align:center; }
+  .skinItem .skinUnlockHint{ color:var(--sub); font-size:.56rem; text-align:center; line-height:1.3; white-space:nowrap; }
+  .skinItem .skinAbility{ color:var(--gold); font-size:.58rem; font-weight:700; text-align:center; }
+  .skinItem .equipBtn{
+    margin-top:auto;
+    width:100%; border:none; border-radius:7px; padding:5px 0; font-size:.6rem; font-weight:800;
+    background:var(--line); color:var(--sub); cursor:pointer;
+  }
+  .skinItem.done .equipBtn{ background:color-mix(in srgb, var(--accent) 25%, var(--card)); color:var(--accent); cursor:pointer; }
+  .skinItem.equipped .equipBtn{ background:var(--gold); color:#2a1c00; }
+
+  .combo{
+    text-align:center;
+    font-size:.7rem; color:var(--gold); font-weight:800; letter-spacing:1px; height:14px;
+    opacity:0; transition:opacity .2s ease;
+  }
+  .combo.show{ opacity:1; }
+
+  .centerArea{
+    flex:1; min-height:0; width:100%; margin-top:16px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  }
+  .score{
+    flex:0 0 auto;
+    font-size:2.5rem; font-weight:900; margin:0; color:var(--text);
+    letter-spacing:1px; font-variant-numeric:tabular-nums;
+  }
+  .rate{ flex:0 0 auto; color:var(--sub); font-size:.72rem; margin:2px 0 10px; letter-spacing:.5px;}
+  .kbHint{color:var(--sub); font-size:.6rem; opacity:.6; margin-bottom:8px;}
+
+  .touchWrap{
+    position:relative; flex:0 0 auto; margin:16px auto 0;
+    width:150px; height:150px;
+  }
+  .coreRing{
+    position:absolute; inset:-8px; border-radius:50%;
+    border:2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+    animation:ringSpin 14s linear infinite;
+  }
+  .coreRing.ring2{
+    inset:-20px; border-style:solid; border-width:1px;
+    border-color:color-mix(in srgb, var(--accent) 22%, transparent);
+    animation-duration:20s; animation-direction:reverse;
+  }
+  @keyframes ringSpin{ to{ transform:rotate(360deg); } }
+
+  .touchBtn{
+    position:absolute; inset:4px; border-radius:50%; border:none; cursor:pointer; z-index:2;
+    background:
+      radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--accent) 88%, white) 0%, var(--accent) 32%, var(--accent2) 64%, #062617 100%);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent),
+      0 0 32px color-mix(in srgb, var(--accent) 55%, transparent),
+      inset 0 -10px 18px rgba(0,0,0,.35),
+      inset 0 8px 16px rgba(255,255,255,.28);
+    color:#04160e; font-size:1.05rem; font-weight:900; letter-spacing:3px;
+    transition:transform .05s ease; -webkit-tap-highlight-color:transparent; user-select:none;
+    text-shadow:0 1px 0 rgba(255,255,255,.35);
+    animation:corePulse 2.6s ease-in-out infinite;
+  }
+  @keyframes corePulse{
+    0%,100%{
+      box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent),
+        0 0 32px color-mix(in srgb, var(--accent) 55%, transparent),
+        inset 0 -10px 18px rgba(0,0,0,.35), inset 0 8px 16px rgba(255,255,255,.28);
+    }
+    50%{
+      box-shadow:0 0 0 6px color-mix(in srgb, var(--accent) 32%, transparent),
+        0 0 48px color-mix(in srgb, var(--accent) 68%, transparent),
+        inset 0 -10px 18px rgba(0,0,0,.35), inset 0 8px 16px rgba(255,255,255,.28);
+    }
+  }
+  .touchBtn:active{ transform:scale(.92); }
+  .touchBtn.kbPress{ transform:scale(.92); }
+
+  .float{
+    position:absolute; left:50%; top:20%; transform:translate(-50%,0);
+    font-weight:900; color:var(--gold); pointer-events:none; z-index:5;
+    text-shadow:0 0 6px var(--gold);
+    animation:rise .7s ease-out forwards; font-size:1rem;
+  }
+  @keyframes rise{ to{ transform:translate(-50%,-80px); opacity:0; } }
+
+  .spark{
+    position:absolute; width:4px; height:4px; pointer-events:none; z-index:4;
+    animation:sparkFly .55s ease-out forwards; background:var(--accent);
+  }
+  @keyframes sparkFly{ to{ transform:translate(var(--dx),var(--dy)) scale(0); opacity:0; } }
+
+  .right{
+    flex:0 0 26%; min-height:140px; display:flex; flex-direction:column; gap:6px; overflow:hidden;
+  }
+  .tabsRow{ display:flex; gap:6px; align-items:center; }
+  .qtyRow{ display:flex; gap:4px; }
+  .left{ box-shadow:inset 0 0 40px color-mix(in srgb, var(--accent) 7%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); }
+  .xpFill{ box-shadow:0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .combo{ font-size:.82rem; height:16px; text-shadow:0 0 10px color-mix(in srgb, var(--gold) 60%, transparent); }
+  .combo.pop{ animation:comboPop .14s ease-out; }
+  @keyframes comboPop{ 0%{ transform:scale(1.35); } 100%{ transform:scale(1); } }
+  .reduceFx .combo.pop{ animation:none; }
+  .monsterBox{
+    position:relative; width:min(88%,290px); display:flex; align-items:center; gap:10px;
+    padding:6px 10px; margin:2px 0 6px; border:1px solid var(--line); border-radius:12px;
+    background:color-mix(in srgb, var(--card) 85%, transparent); flex:0 0 auto;
+  }
+  .monsterBox.boss{ border-color:#ff4d4d; box-shadow:0 0 12px rgba(255,77,77,.35); }
+  .monsterEmoji{ font-size:1.9rem; line-height:1; flex:0 0 auto; }
+  .monsterEmoji.hit{ animation:monsterHit .1s ease-out; }
+  @keyframes monsterHit{ 0%{ transform:scale(.82) rotate(-7deg); } 100%{ transform:scale(1) rotate(0); } }
+  .monsterInfo{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .monsterName{ font-size:.64rem; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .monsterBox.boss .monsterName{ color:#ff8a8a; }
+  .monsterBar{ height:8px; border-radius:4px; background:var(--line); overflow:hidden; }
+  .monsterHpFill{ height:100%; width:100%; background:linear-gradient(90deg,#ff4d4d,#ff8a4d); transition:width .12s ease; }
+  .monsterHpText{ font-size:.58rem; color:var(--sub); font-variant-numeric:tabular-nums; }
+  .killPop{ position:absolute; right:12px; top:-4px; font-size:.78rem; font-weight:900; color:var(--gold); pointer-events:none; animation:killRise .9s ease-out forwards; }
+  .killPop.fail{ color:#ff6b6b; }
+  @keyframes killRise{ 0%{ transform:translateY(0); opacity:1; } 100%{ transform:translateY(-26px); opacity:0; } }
+  .reduceFx .monsterEmoji.hit{ animation:none; }
+  .huntMode .touchWrap{ display:none !important; }
+  .huntMode .monsterBox{ flex-direction:column; width:min(92%,320px); gap:6px; padding:16px 14px; margin:8px 0; text-align:center; }
+  .huntMode .monsterEmoji{ font-size:4.4rem; }
+  .huntMode .monsterInfo{ width:100%; align-items:stretch; }
+  .huntMode .monsterName{ font-size:.82rem; }
+  .huntMode .monsterBar{ height:12px; }
+  .huntMode .monsterHpText{ font-size:.7rem; }
+  .dmgPop{ position:absolute; top:10px; font-size:.8rem; font-weight:900; color:#fff; text-shadow:0 0 6px #000; pointer-events:none; animation:dmgRise .7s ease-out forwards; }
+  .dmgPop.crit{ color:#ff6b6b; font-size:1.05rem; }
+  @keyframes dmgRise{ 0%{ transform:translateY(0); opacity:1; } 100%{ transform:translateY(-24px); opacity:0; } }
+  .subBtn{
+    flex:1; padding:5px 0; text-align:center; border-radius:6px; font-size:.64rem; font-weight:700;
+    background:var(--card); color:var(--sub); cursor:pointer; border:1px solid var(--line);
+  }
+  .subBtn.active{ background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  .subBtn.alert{ color:#ff8a8a; border-color:#ff4d4d; }
+  .subBtn.active.alert{ background:#ff3b3b; color:#fff; border-color:#ff3b3b; }
+  .tab.alert{ border-color:#ff4d4d; box-shadow:0 0 10px rgba(255,77,77,.35); }
+  .tabBadge{
+    position:absolute; top:2px; right:3px; min-width:15px; height:15px; line-height:15px; padding:0 4px;
+    border-radius:7px; background:#ff3b3b; color:#fff; font-size:.58rem; font-weight:800; text-align:center;
+  }
+  .qtyBtn{
+    flex:1; padding:4px 0; text-align:center; border-radius:6px; font-size:.62rem; font-weight:700;
+    background:var(--card); color:var(--sub); cursor:pointer; border:1px solid var(--line);
+  }
+  .qtyBtn.active{ background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  .tabs{ display:flex; gap:6px; flex:1; }
+  .tab{
+    position:relative; flex:1; padding:7px 0 8px; text-align:center; border-radius:10px; font-size:.7rem; line-height:1.2;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    background:var(--card); color:var(--sub); cursor:pointer; border:1px solid var(--line); font-weight:700;
+    transition:transform .1s ease;
+  }
+  .tab::before{ content:attr(data-icon); font-size:1.2rem; line-height:1; }
+  .tab:active{ transform:scale(.94); }
+  .tab.active{
+    color:var(--bg); border-color:var(--accent); background:var(--accent);
+    box-shadow:0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .listWrap{
+    flex:1; overflow-x:auto; overflow-y:hidden; display:flex; flex-direction:row; gap:8px; padding-bottom:4px;
+  }
+
+  .item{
+    flex:0 0 176px; display:flex; flex-direction:column; justify-content:space-between; gap:6px;
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:9px 10px;
+  }
+  .item .info{ display:flex; flex-direction:column; }
+  .item .name{ font-weight:800; font-size:.76rem; }
+  .item .desc{ color:var(--sub); font-size:.63rem; margin-top:1px; }
+  .item button{
+    border:none; border-radius:7px; padding:6px 9px; font-weight:800; font-size:.68rem;
+    background:var(--accent); color:var(--bg); cursor:pointer; align-self:flex-start; min-width:58px;
+  }
+  .item button:disabled{ background:var(--line); color:var(--sub); cursor:default; }
+
+  .achItem{
+    flex:0 0 176px; display:flex; flex-direction:column; justify-content:space-between; gap:5px;
+    background:var(--card); border-radius:10px; padding:9px 10px; font-size:.68rem;
+    opacity:.35; border:1px solid var(--line);
+  }
+  .achItem.done{ opacity:1; border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+  .achItem.equipped{ border-color:var(--gold); box-shadow:0 0 10px color-mix(in srgb, var(--gold) 30%, transparent); }
+  .achItem .achName{ color:var(--accent); font-weight:800; }
+  .achItem .achDesc{ color:var(--sub); font-size:.6rem; }
+  .achItem .achAbility{ color:var(--gold); font-size:.62rem; font-weight:700; }
+  .achItem .equipBtn{
+    margin-top:2px; border:none; border-radius:7px; padding:5px 0; font-size:.62rem; font-weight:800;
+    background:var(--line); color:var(--sub); cursor:pointer;
+  }
+  .achItem.done .equipBtn{ background:color-mix(in srgb, var(--accent) 25%, var(--card)); color:var(--accent); cursor:pointer; }
+  .achItem.equipped .equipBtn{ background:var(--gold); color:#2a1c00; }
+
+  .resetBtn{ background:none; border:1px solid var(--line); color:var(--sub); border-radius:8px; padding:7px 10px; font-size:.63rem; cursor:pointer; white-space:nowrap; }
+
+  .flash{
+    position:absolute; inset:0; pointer-events:none; z-index:6; border-radius:16px;
+    background:color-mix(in srgb, var(--accent) 22%, transparent); opacity:0;
+  }
+  .flash.go{ animation:flashPop .45s ease-out; }
+  .flash.gold.go{ animation:flashPopGold .8s ease-out; }
+  @keyframes flashPop{ 0%{ opacity:.9; } 100%{ opacity:0; } }
+  @keyframes flashPopGold{
+    0%{ opacity:0; background:radial-gradient(circle, rgba(255,225,140,.95), rgba(255,180,40,.5)); }
+    35%{ opacity:1; }
+    100%{ opacity:0; background:radial-gradient(circle, rgba(255,225,140,.95), rgba(255,180,40,.5)); }
+  }
+
+  .shake{ animation:shakeIt .5s ease; }
+  @keyframes shakeIt{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-6px); }
+    40%{ transform:translateX(6px); }
+    60%{ transform:translateX(-4px); }
+    80%{ transform:translateX(4px); }
+  }
+
+  .prestigeToast{
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-10px) scale(.9);
+    background:linear-gradient(135deg, #3a2a00, #1a1000);
+    border:1px solid var(--gold);
+    color:var(--gold); font-weight:900; font-size:1rem;
+    padding:12px 22px; border-radius:14px; z-index:12; white-space:nowrap; text-align:center;
+    opacity:0; pointer-events:none;
+    box-shadow:0 0 30px color-mix(in srgb, var(--gold) 45%, transparent);
+  }
+  .prestigeToast.show{ opacity:1; transform:translate(-50%,0) scale(1); transition:all .35s cubic-bezier(.2,1.4,.4,1); }
+  .prestigeToast.hide{ opacity:0; transform:translate(-50%,-16px) scale(.92); transition:all .5s ease; }
+
+  .upToast{
+    position:absolute; left:50%; top:16%; transform:translate(-50%,-6px);
+    background:color-mix(in srgb, var(--accent) 16%, var(--card));
+    border:1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    color:var(--accent); font-weight:800; font-size:.78rem;
+    padding:6px 14px; border-radius:20px; z-index:7; white-space:nowrap;
+    opacity:0; pointer-events:none;
+  }
+  .upToast.go{ animation:upPop .1s ease-out; }
+  @keyframes upPop{
+    0%{ opacity:0; transform:translate(-50%,6px) scale(.9); }
+  }
+  .upToast.show{ opacity:1; transform:translate(-50%,-6px) scale(1); transition:all .25s ease; }
+  .upToast.hide{ opacity:0; transform:translate(-50%,-22px) scale(.95); transition:all .4s ease; }
+
+  .ringPulse{
+    position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:3;
+    border:2px solid var(--accent); opacity:0;
+  }
+  .ringPulse.go{ animation:ringOut .6s ease-out forwards; }
+  @keyframes ringOut{ 0%{ opacity:.9; transform:scale(.7); } 100%{ opacity:0; transform:scale(1.9); } }
+
+  .bought{ animation:boughtPop .35s ease; }
+  @keyframes boughtPop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.08); } 100%{ transform:scale(1); } }
+
+  .float.crit{ color:#ff5c5c; font-size:1.25rem; text-shadow:0 0 10px #ff5c5c; }
+
+  .prestigeBox{
+    flex:0 0 100%; display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px;
+  }
+  .prestigeBox .pTitle{ font-weight:800; font-size:.8rem; color:var(--gold); }
+  .prestigeBox .pDesc{ color:var(--sub); font-size:.66rem; text-align:center; }
+  .prestigeBox button{
+    border:none; border-radius:8px; padding:7px 16px; font-weight:800; font-size:.72rem;
+    background:var(--gold); color:#2a1c00; cursor:pointer;
+  }
+  .prestigeBox button:disabled{ background:var(--line); color:var(--sub); cursor:default; }
+
+  .modalOverlay{
+    position:absolute; inset:0; background:rgba(0,0,0,.55); z-index:30;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .2s ease; border-radius:16px;
+  }
+  .modalOverlay.show{ opacity:1; pointer-events:auto; }
+  .modalBox{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; max-width:80%; width:280px; text-align:center;
+  }
+  .modalBox p{ font-size:.76rem; color:var(--text); margin:0 0 14px; line-height:1.5; }
+  .modalBtns{ display:flex; gap:8px; justify-content:center; }
+  .modalBtns button{
+    border:none; border-radius:8px; padding:7px 16px; font-weight:800; font-size:.72rem; cursor:pointer;
+  }
+  .modalBtns .confirmBtn{ background:var(--accent); color:var(--bg); }
+  .modalBtns .cancelBtn{ background:var(--line); color:var(--sub); }
+
+  /* ---- Main menu ---- */
+  #menuOverlay, #diffOverlay, #lbOverlay, #introOverlay{
+    position:fixed; inset:0; z-index:150; background:rgba(0,0,0,.6);
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  #menuOverlay.show, #diffOverlay.show, #lbOverlay.show, #introOverlay.show{ display:flex; }
+  #introOverlay{ z-index:155; }
+  #introNick{
+    flex:1; min-width:0; border-radius:8px; border:1px solid var(--line); background:var(--card);
+    color:var(--text); padding:9px 10px; font-size:.82rem; -webkit-user-select:text; user-select:text;
+  }
+  .tutBody{ text-align:center; display:flex; flex-direction:column; gap:8px; min-height:170px; align-items:center; justify-content:center; }
+  .tutIcon{ font-size:3rem; line-height:1; }
+  .tutTitle{ font-size:.95rem; font-weight:900; color:var(--text); }
+  .tutText{ font-size:.76rem; color:var(--sub); line-height:1.55; }
+  .tutDots{ display:flex; gap:6px; justify-content:center; }
+  .tutDot{ width:7px; height:7px; border-radius:50%; background:var(--line); }
+  .tutDot.on{ background:var(--accent); }
+  .tutNav{ display:flex; gap:8px; }
+  .tutNav .menuItemBtn{ flex:1; }
+  #lbOverlay{ z-index:160; }
+  #lbList{ display:flex; flex-direction:column; gap:4px; max-height:34vh; overflow-y:auto; }
+  .lbRow{
+    display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:8px; align-items:center;
+    padding:6px 8px; border-radius:8px; background:var(--card); border:1px solid var(--line); font-size:.72rem;
+  }
+  .lbRow.me{ border-color:var(--gold); }
+  .lbRank{ font-weight:900; color:var(--gold); text-align:center; }
+  .lbName{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lbVal{ font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .lbNickRow{ display:flex; gap:6px; }
+  #lbNick{
+    flex:1; min-width:0; border-radius:8px; border:1px solid var(--line); background:var(--card);
+    color:var(--text); padding:7px 9px; font-size:.76rem; -webkit-user-select:text; user-select:text;
+  }
+  .lbStatus{ font-size:.62rem; color:var(--sub); line-height:1.4; white-space:pre-line; }
+  .lbMine{ font-size:.66rem; color:var(--text); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .diffCard{ text-align:left; display:flex; flex-direction:column; gap:2px; }
+  .diffCard .dName{ font-size:.86rem; font-weight:800; }
+  .diffCard .dDesc{ font-size:.66rem; color:var(--sub); font-weight:600; }
+  .diffCard .dBest{ font-size:.62rem; color:var(--gold); font-weight:700; }
+  .diffCard.normal{ border-color:color-mix(in srgb, var(--accent) 50%, transparent); }
+  .diffCard.hard{ border-color:color-mix(in srgb, var(--gold) 60%, transparent); }
+  .diffCard.hell{ border-color:color-mix(in srgb, #ff4d4d 65%, transparent); }
+  .diffCard.hell .dName{ color:#ff6b6b; }
+  .rogueDiffTag{ font-size:.6rem; font-weight:800; color:var(--gold); border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
+  .menuCard{
+    width:min(92vw,320px); max-height:86vh; overflow-y:auto;
+    background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .menuCard h3{ margin:0 0 2px; font-size:.95rem; color:var(--text); text-align:center; }
+  .menuItemBtn{
+    width:100%; border:1px solid var(--line); background:var(--card); color:var(--text);
+    border-radius:10px; padding:10px 12px; font-size:.78rem; font-weight:700; cursor:pointer;
+  }
+  .menuItemBtn.ghost{ color:var(--sub); }
+  .setRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:.76rem; color:var(--text); }
+  .setToggle{
+    min-width:54px; border:none; border-radius:8px; padding:6px 10px; font-size:.7rem; font-weight:800;
+    background:var(--line); color:var(--sub); cursor:pointer;
+  }
+  .setToggle.on{ background:var(--accent); color:var(--bg); }
+  .reduceFx .flash{ display:none !important; }
+  .reduceFx .shake{ animation:none !important; }
+  .reduceFx .ringPulse{ display:none !important; }
+
+  #loadingScreen{
+    position:fixed; inset:0; z-index:200;
+    background:linear-gradient(160deg, var(--bg), var(--bg2));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    transition:opacity .5s ease;
+  }
+  #loadingScreen.hide{ opacity:0; pointer-events:none; }
+  .loadLogo{
+    font-size:2.4rem; animation:loadPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes loadPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); } }
+  .loadTitle{ color:var(--text); font-size:.95rem; letter-spacing:2px; font-weight:800; }
+  .loadBarBg{ width:160px; height:6px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .loadBarFill{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .2s ease; }
+  .loadHint{ color:var(--sub); font-size:.62rem; }
+
+  #mainMenu{
+    position:fixed; inset:0; z-index:100; overflow:hidden;
+    background:
+      radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--accent2) 30%, transparent), transparent 45%),
+      radial-gradient(circle at 85% 88%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 45%),
+      linear-gradient(160deg, var(--bg), var(--bg2));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    padding:20px;
+  }
+  #mainMenu::before{
+    content:""; position:absolute; inset:-20% -40%; pointer-events:none; z-index:0;
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px);
+    background-size:44px 44px;
+    transform:perspective(520px) rotateX(58deg) translateY(0);
+    animation:gridScroll 8s linear infinite;
+    will-change:transform;
+  }
+  @keyframes gridScroll{
+    from{ transform:perspective(520px) rotateX(58deg) translateY(0); }
+    to{ transform:perspective(520px) rotateX(58deg) translateY(44px); }
+  }
+  #mainMenu::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(circle at 50% 55%, transparent 22%, var(--bg) 78%);
+  }
+  #mainMenu > *{ position:relative; z-index:1; }
+  #mainMenu > .menuOrb{ position:absolute; z-index:0; }
+  .menuOrb{ border-radius:50%; opacity:.6; pointer-events:none; animation:orbFloat 6s ease-in-out infinite; will-change:transform; }
+  .reduceFx #mainMenu::before, .reduceFx .menuOrb, .reduceFx .menuBtn::after, .reduceFx .titleEmoji, .reduceFx #mainMenu h1{ animation:none !important; }
+  .menuOrb.o1{ width:10px; height:10px; left:14%; top:20%; background:var(--accent); box-shadow:0 0 14px var(--accent); }
+  .menuOrb.o2{ width:7px; height:7px; left:84%; top:28%; background:var(--gold); box-shadow:0 0 12px var(--gold); animation-delay:-2s; }
+  .menuOrb.o3{ width:12px; height:12px; left:72%; top:74%; background:var(--accent2); box-shadow:0 0 16px var(--accent2); animation-delay:-4s; }
+  .menuOrb.o4{ width:6px; height:6px; left:20%; top:80%; background:var(--gold); box-shadow:0 0 10px var(--gold); animation-delay:-1s; }
+  @keyframes orbFloat{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-22px) scale(1.25); } }
+  .titleBlock{ display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom:8px; }
+  .titleEmoji{
+    font-size:2.8rem; animation:titleBounce 1.8s ease-in-out infinite;
+    text-shadow:0 0 14px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  @keyframes titleBounce{ 0%,100%{ transform:translateY(0) rotate(-6deg); } 50%{ transform:translateY(-10px) rotate(6deg); } }
+  #mainMenu h1{
+    font-size:2.1rem; font-weight:900; letter-spacing:4px; margin:0; cursor:pointer;
+    background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));
+    background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:titleShine 6s linear infinite;
+  }
+  @keyframes titleShine{ to{ background-position:200% 0; } }
+  .titleSub{ font-size:.64rem; letter-spacing:8px; color:var(--sub); font-weight:700; padding-left:8px; }
+  #mainMenu .menuSub{ color:var(--sub); font-size:.74rem; margin:6px 0 2px; }
+  .menuBtn{
+    position:relative; overflow:hidden; width:min(84vw,320px); padding:14px 16px 14px 74px;
+    border-radius:16px; border:1px solid var(--line); color:var(--text); font-size:1rem; font-weight:900;
+    cursor:pointer; text-align:left; transition:transform .12s ease, box-shadow .2s ease;
+    background:linear-gradient(135deg, color-mix(in srgb, var(--card) 80%, transparent), var(--card));
+  }
+  .menuBtn::before{
+    content:attr(data-icon); position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    width:46px; height:46px; border-radius:13px; display:flex; align-items:center; justify-content:center;
+    font-size:1.5rem; background:color-mix(in srgb, var(--btnc) 22%, transparent);
+    border:1px solid color-mix(in srgb, var(--btnc) 55%, transparent);
+  }
+  .menuBtn::after{
+    content:""; position:absolute; top:0; left:0; width:36%; height:100%; pointer-events:none;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.16), transparent);
+    transform:translateX(-170%) skewX(-20deg); animation:btnShine 3.8s ease-in-out infinite;
+    will-change:transform;
+  }
+  @keyframes btnShine{
+    0%,55%{ transform:translateX(-170%) skewX(-20deg); }
+    100%{ transform:translateX(420%) skewX(-20deg); }
+  }
+  .menuBtn:active{ transform:scale(.97); }
+  .menuBtn.locked{ opacity:.6; filter:grayscale(.55); }
+  .menuBtn.locked::before{ content:"🔒"; }
+  .menuBtn .menuBtnDesc{ display:block; font-size:.66rem; font-weight:500; color:var(--sub); margin-top:4px; line-height:1.4; }
+  .menuBtn.normal{ --btnc:var(--accent); border-color:color-mix(in srgb, var(--accent) 55%, transparent); box-shadow:0 0 18px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .menuBtn.rogue{ --btnc:var(--gold); border-color:color-mix(in srgb, var(--gold) 55%, transparent); box-shadow:0 0 18px color-mix(in srgb, var(--gold) 20%, transparent); }
+  .menuStats{
+    margin-top:4px; font-size:.64rem; color:var(--sub); letter-spacing:1px; padding:5px 14px;
+    border-radius:999px; border:1px solid var(--line); background:color-mix(in srgb, var(--card) 80%, transparent);
+  }
+  .settingsBtn{
+    background:none; border:1px solid var(--line); color:var(--sub);
+    border-radius:10px; padding:8px 20px; font-size:.78rem; font-weight:700; cursor:pointer; margin-top:4px;
+  }
+  .settingsBox{ width:300px; text-align:left; }
+  .settingRow{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:.78rem; color:var(--text);
+  }
+  .settingToggle{
+    border:1px solid var(--line); border-radius:7px; padding:5px 12px; font-size:.68rem; font-weight:700;
+    background:var(--line); color:var(--sub); cursor:pointer; min-width:56px;
+  }
+  .settingToggle.on{ background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  .settingAction{
+    border:1px solid var(--line); border-radius:7px; padding:5px 12px; font-size:.68rem; font-weight:700;
+    background:var(--card); color:var(--accent); cursor:pointer;
+  }
+  .settingAction.danger{ color:#ff5c5c; border-color:color-mix(in srgb, #ff5c5c 45%, transparent); }
+
+  .menuIconBtn{
+    flex:0 0 auto; white-space:nowrap;
+    background:var(--card); border:1px solid var(--line); color:var(--sub);
+    border-radius:8px; padding:3px 8px; font-size:.62rem; font-weight:700; cursor:pointer;
+  }
+
+  /* ---- Roguelite mode ---- */
+  #rogueStage{ display:none; }
+  .rogueTop{
+    width:100%; flex:0 0 auto; position:relative; z-index:6;
+    display:flex; justify-content:space-between; align-items:center; font-size:.7rem; color:var(--sub); margin-top:4px;
+  }
+  .rogueTimer{ color:var(--gold); font-weight:800; }
+  .rogueCore{ color:var(--accent); font-weight:700; }
+  .buffOverlay{
+    position:absolute; inset:0; z-index:20; border-radius:16px;
+    background:rgba(0,0,0,.6); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    opacity:0; pointer-events:none; transition:opacity .2s ease; padding:14px;
+  }
+  .buffOverlay.show{ opacity:1; pointer-events:auto; }
+  .buffOverlay h3{ color:var(--gold); margin:0 0 4px; font-size:.9rem; }
+  .buffCard{
+    width:min(85%,260px); height:82px; flex:0 0 auto; overflow:hidden;
+    display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:8px 14px; cursor:pointer; text-align:left;
+  }
+  .buffCard:hover{ border-color:var(--accent); }
+  .buffCard.locked{ opacity:.45; cursor:default; pointer-events:none; }
+  .buffCard.synergy{ box-shadow:0 0 12px color-mix(in srgb, var(--gold) 60%, transparent); }
+  .bSynergy{ margin-left:6px; font-size:.58rem; font-weight:800; color:var(--gold); }
+  .synergyToast{
+    position:absolute; left:50%; top:14%; transform:translate(-50%,-8px); z-index:12;
+    background:linear-gradient(135deg,#3a2a00,#1a1000); border:1px solid var(--gold);
+    color:var(--gold); font-weight:800; font-size:.78rem; text-align:center;
+    padding:8px 16px; border-radius:14px; max-width:86%; opacity:0; pointer-events:none;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .synergyToast.show{ opacity:1; transform:translate(-50%,0); }
+  .buffCard.rare{ border-color:#4ea1ff; box-shadow:0 0 8px rgba(78,161,255,.25); }
+  .buffCard.epic{ border-color:#b26bff; box-shadow:0 0 10px rgba(178,107,255,.3); }
+  .buffCard.legendary{ border-color:var(--gold); box-shadow:0 0 14px color-mix(in srgb, var(--gold) 45%, transparent); }
+  .buffCard.mythic{
+    border:2px solid transparent;
+    background-image:linear-gradient(var(--card),var(--card)), linear-gradient(90deg,#ff4d4d,#ffb238,#ffe14d,#4affa1,#4ea1ff,#b26bff,#ff4d4d);
+    background-origin:border-box; background-clip:padding-box, border-box;
+    background-size:100% 100%, 300% 100%;
+    animation:mythicShift 3s linear infinite;
+    box-shadow:0 0 18px rgba(255,255,255,.25);
+  }
+  @keyframes mythicShift{ to{ background-position:0 0, 300% 0; } }
+  .bRarity{ display:inline-block; font-size:.58rem; font-weight:800; padding:1px 6px; border-radius:6px; margin-bottom:3px; }
+  .bRarity.rare{ background:rgba(78,161,255,.18); color:#4ea1ff; }
+  .bRarity.epic{ background:rgba(178,107,255,.18); color:#b26bff; }
+  .bRarity.legendary{ background:color-mix(in srgb, var(--gold) 20%, transparent); color:var(--gold); }
+  .bRarity.mythic{
+    background:linear-gradient(90deg,#ff4d4d,#ffb238,#ffe14d,#4affa1,#4ea1ff,#b26bff);
+    background-size:300% 100%; animation:mythicShift 3s linear infinite;
+    color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+  .buffCard .bName{ font-weight:800; font-size:.78rem; color:var(--text); }
+  .buffCard .bDesc{ font-size:.66rem; color:var(--sub); margin-top:2px; }
+  .runEndBox{
+    position:absolute; inset:0; z-index:21; border-radius:16px;
+    background:rgba(0,0,0,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    opacity:0; pointer-events:none; transition:opacity .2s ease; padding:14px; text-align:center;
+  }
+  .runEndBox.show{ opacity:1; pointer-events:auto; }
+  .runEndBox h3{ color:var(--gold); margin:0; font-size:1rem; }
+  .runEndBox .rBtn{
+    border:none; border-radius:9px; padding:8px 18px; font-weight:800; font-size:.76rem; cursor:pointer;
+    background:var(--accent); color:var(--bg); margin-top:6px;
+  }
+
+  @media (max-width:640px){
+    .left{ padding:6px; }
+    .score{ font-size:1.7rem; margin-top:34px; }
+    .right{ flex-basis:30%; min-height:120px; }
+  }
+</style>
+</head>
+<body>
+  <div id="diffOverlay">
+    <div class="menuCard">
+      <h3>난이도 선택</h3>
+      <div id="diffCards" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button class="menuItemBtn ghost" id="diffCancel">취소</button>
+    </div>
+  </div>
+  <div id="introOverlay">
+    <div class="menuCard">
+      <div id="introNickView" style="display:flex;flex-direction:column;gap:10px;">
+        <h3>환영해요! 닉네임을 정해 주세요</h3>
+        <div class="tutText" style="text-align:center;">순위표에 표시되는 이름이에요. 나중에 메뉴에서 바꿀 수 있어요.</div>
+        <div class="lbNickRow">
+          <input id="introNick" maxlength="10" placeholder="닉네임 (2~10자)" autocomplete="off">
+        </div>
+        <div class="setMsg" id="introMsg" style="min-height:14px;font-size:.64rem;color:var(--gold);text-align:center;"></div>
+        <button class="menuItemBtn" id="introNickOk">확인</button>
+        <button class="menuItemBtn ghost" id="introNickSkip">나중에 정할게요</button>
+      </div>
+      <div id="introTutView" style="display:none;flex-direction:column;gap:12px;">
+        <div class="tutBody" id="tutBody"></div>
+        <div class="tutDots" id="tutDots"></div>
+        <div class="tutNav">
+          <button class="menuItemBtn ghost" id="tutPrev">이전</button>
+          <button class="menuItemBtn" id="tutNext">다음</button>
+        </div>
+        <button class="menuItemBtn ghost" id="tutSkip">건너뛰기</button>
+      </div>
+    </div>
+  </div>
+  <div id="lbOverlay">
+    <div class="menuCard">
+      <h3>🏆 순위표</h3>
+      <div class="lbNickRow">
+        <input id="lbNick" maxlength="10" placeholder="닉네임 (2~10자)" autocomplete="off">
+        <button class="menuItemBtn" id="lbSave" style="width:auto;padding:7px 12px;">저장</button>
+      </div>
+      <div class="setMsg" id="lbMsg" style="min-height:14px;font-size:.64rem;color:var(--gold);"></div>
+      <div class="lbMine" id="lbMine"></div>
+      <div style="display:flex;gap:4px;">
+        <button class="subBtn active" data-lb="bestStage">몬스터</button>
+        <button class="subBtn" data-lb="rogueBest">로그라이트</button>
+        <button class="subBtn" data-lb="prestige">환생</button>
+      </div>
+      <div id="lbList"></div>
+      <div class="lbStatus" id="lbStatus"></div>
+      <button class="menuItemBtn ghost" id="lbClose">닫기</button>
+    </div>
+  </div>
+  <div id="menuOverlay">
+    <div class="menuCard">
+      <div id="menuView" style="display:flex;flex-direction:column;gap:10px;">
+        <h3>메뉴</h3>
+        <button class="menuItemBtn" id="menuOpenSettings">⚙️ 설정</button>
+        <button class="menuItemBtn" id="menuOpenBoard">🏆 순위표 · 닉네임</button>
+        <button class="menuItemBtn" id="menuGoMain">🏠 메인으로</button>
+        <button class="menuItemBtn ghost" id="menuClose">닫기</button>
+      </div>
+      <div id="settingsView" style="display:none;flex-direction:column;gap:10px;">
+        <h3>설정</h3>
+        <div class="setRow"><span>화면 효과 줄이기</span><button class="setToggle" id="setReduceFx">OFF</button></div>
+        <div class="setRow"><span>진동</span><button class="setToggle" id="setVibrate">OFF</button></div>
+        <button class="menuItemBtn ghost" id="setBack">← 뒤로</button>
+      </div>
+    </div>
+  </div>
+  <div id="loadingScreen" class="hide">
+    <div class="loadLogo">👆</div>
+    <div class="loadTitle">터치 시뮬레이터</div>
+    <div class="loadBarBg"><div class="loadBarFill" id="loadBarFill"></div></div>
+    <div class="loadHint" id="loadHint">불러오는 중...</div>
+  </div>
+  <div id="mainMenu">
+    <span class="menuOrb o1"></span><span class="menuOrb o2"></span><span class="menuOrb o3"></span><span class="menuOrb o4"></span>
+    <div class="titleBlock">
+      <div class="titleEmoji">👆</div>
+      <h1 id="menuTitle">터치 시뮬레이터</h1>
+      <div class="titleSub">TOUCH SIMULATOR</div>
+    </div>
+    <div class="menuSub">모드를 선택하세요</div>
+    <button class="menuBtn normal" id="startNormalBtn" data-icon="👆">
+      일반 모드
+      <span class="menuBtnDesc">클릭으로 성장하는 기본 클리커<br>상점 · 타이틀 · 환생 · 미션</span>
+    </button>
+    <button class="menuBtn rogue" id="startRogueBtn" data-icon="⚔️">
+      로그라이트 모드
+      <span class="menuBtnDesc">제한 시간 런 + 랜덤 버프 · 난이도 선택<br>획득 점수는 일반 모드에 누적</span>
+    </button>
+    <button class="settingsBtn" id="openBoardBtn">🏆 순위표</button>
+    <button class="settingsBtn" id="openSettingsBtn">⚙️ 설정</button>
+    <div class="menuStats" id="menuStats"></div>
+  </div>
+  <div class="stage" id="normalStage" style="display:none;">
+    <div class="left">
+      <div class="flash" id="flash"></div>
+      <div class="upToast" id="upToast"></div>
+      <div class="prestigeToast" id="prestigeToast"></div>
+      <div class="topPanel">
+        <div class="hud">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;">
+            <button class="menuIconBtn" id="backBtn1">☰ 메뉴</button>
+            <div class="lvBadge">LV <span id="lvNum">1</span> · 환생 <span id="prestigeNum">0</span> · <span id="titleName" class="titleTag">초보 터처</span></div>
+            <button class="menuIconBtn" id="huntBtn">⚔️ 도전</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div id="nextLv">다음 LV까지 100</div>
+            <button id="muteBtn" class="muteBtn">🔊</button>
+          </div>
+        </div>
+        <div class="xpBar"><div class="xpFill" id="xpFill"></div></div>
+      </div>
+      <div class="centerArea">
+        <div class="combo" id="combo"></div>
+        <div class="score" id="score">0</div>
+        <div class="rate" id="rate">클릭당 +1 · 초당 +0</div>
+        <div class="monsterBox" id="monsterBox">
+          <div class="monsterEmoji" id="monsterEmoji">🟢</div>
+          <div class="monsterInfo">
+            <div class="monsterName" id="monsterName"></div>
+            <div class="monsterBar"><div class="monsterHpFill" id="monsterHpFill"></div></div>
+            <div class="monsterHpText" id="monsterHpText"></div>
+          </div>
+        </div>
+        <div class="touchWrap" id="touchWrap">
+          <div class="coreRing"></div>
+          <div class="coreRing ring2"></div>
+          <div class="ringPulse" id="ringPulse"></div>
+          <button class="touchBtn" id="touchBtn">TOUCH</button>
+        </div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="tabsRow">
+        <div class="tabs">
+          <div class="tab active" data-tab="shop" data-icon="🛒">상점</div>
+          <div class="tab" data-tab="ach" data-icon="🏅">타이틀</div>
+          <div class="tab" data-tab="skin" data-icon="🎨">스킨</div>
+          <div class="tab" data-tab="prestige" data-icon="🔁">환생</div>
+          <div class="tab" data-tab="stats" data-icon="📊">통계</div>
+          <div class="tab" data-tab="mission" data-icon="🎯">미션</div>
+        </div>
+        <button class="resetBtn" id="resetBtn">초기화</button>
+      </div>
+      <div class="qtyRow" id="qtyRow">
+        <button class="qtyBtn active" data-qty="1">x1</button>
+        <button class="qtyBtn" data-qty="5">x5</button>
+        <button class="qtyBtn" data-qty="10">x10</button>
+        <button class="qtyBtn" data-qty="50">x50</button>
+        <button class="qtyBtn" data-qty="100">x100</button>
+      </div>
+      <div class="qtyRow" id="missionSubRow" style="display:none;">
+        <button class="subBtn active" data-sub="daily">일일 미션</button>
+        <button class="subBtn" data-sub="weekly">주간 미션</button>
+        <button class="subBtn" data-sub="skin">스킨 미션</button>
+      </div>
+      <div id="shopTab" class="listWrap"></div>
+      <div id="achTab" class="listWrap" style="display:none;"></div>
+      <div id="skinTab" class="listWrap" style="display:none;"></div>
+      <div id="prestigeTab" class="listWrap" style="display:none;"></div>
+      <div id="statsTab" class="listWrap" style="display:none;"></div>
+      <div id="missionTab" class="listWrap" style="display:none;"></div>
+    </div>
+    <div class="modalOverlay" id="modalOverlay">
+      <div class="modalBox">
+        <p id="modalText"></p>
+        <div class="modalBtns">
+          <button class="cancelBtn" id="modalCancel">취소</button>
+          <button class="confirmBtn" id="modalConfirm">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="rogueStage" style="display:none;">
+    <div class="left" style="flex:1;">
+      <div class="rogueTop">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button class="menuIconBtn" id="backBtn2">☰ 메뉴</button>
+          <span>⏱ <span class="rogueTimer" id="rogueTimerEl">60</span>초</span>
+          <span class="rogueDiffTag" id="rogueDiffTag"></span>
+        </div>
+        <div>최고점수 <span class="rogueCore" id="rogueCoreEl">0</span></div>
+      </div>
+      <div class="centerArea">
+        <div class="score" id="rogueScoreEl">0</div>
+        <div class="rate" id="rogueRateEl">클릭파워 1</div>
+        <div class="touchWrap" id="rogueTouchWrap">
+          <div class="coreRing"></div>
+          <div class="coreRing ring2"></div>
+          <button class="touchBtn" id="rogueTouchBtn">TOUCH</button>
+        </div>
+      </div>
+      <div class="buffOverlay" id="buffOverlay">
+        <h3 id="buffTitle">✦ 능력을 선택하세요</h3>
+        <div id="buffCardsWrap" style="display:flex; flex-direction:column; gap:8px; align-items:center;"></div>
+      </div>
+      <div class="synergyToast" id="synergyToast"></div>
+      <div class="runEndBox" id="runEndBox">
+        <h3>런 종료!</h3>
+        <div id="runEndText" style="font-size:.8rem; color:var(--sub);"></div>
+        <button class="rBtn" id="runEndBtn">메인으로</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const SAVE_KEY = "touch-sim-save-v1";
+
+  // leaderboard plumbing (filled in by initLeaderboard when the page has the db capability)
+  // Online mode: paste the Firebase Realtime Database URL here (e.g. "https://myproject-default-rtdb.asia-southeast1.firebasedatabase.app").
+  // Used only when the page runs outside claude.ai (for example hosted on GitHub Pages).
+  const BOARD_URL = "";
+  function useRest(){ return !!BOARD_URL && !window.claude; }
+  let lbDb = null, lbUid = null, lbCanWrite = false, lbRows = [], lbError = "", lbLastSynced = "", lbBusy = false, lbTimer = null;
+
+  /* ---- loading screen (cosmetic, reused on mode entry) ---- */
+  const loadingScreenEl = document.getElementById("loadingScreen");
+  const loadBarFillEl = document.getElementById("loadBarFill");
+  const loadHintEl = document.getElementById("loadHint");
+  const LOAD_HINTS = ["불러오는 중...", "손가락 풀어주는 중...", "버튼에 광 내는 중...", "거의 다 됐어요..."];
+  function playLoadingScreen(onComplete){
+    if(!loadingScreenEl || !loadBarFillEl){ if(onComplete) onComplete(); return; }
+    loadingScreenEl.classList.remove("hide");
+    loadBarFillEl.style.width = "0%";
+    if(loadHintEl) loadHintEl.textContent = LOAD_HINTS[0];
+    let pct = 0, hintIdx = 0;
+    const step = setInterval(()=>{
+      pct += 10 + Math.random()*16;
+      if(pct >= 100){
+        pct = 100;
+        clearInterval(step);
+        loadBarFillEl.style.width = "100%";
+        setTimeout(()=>{
+          loadingScreenEl.classList.add("hide");
+          if(onComplete) onComplete();
+        }, 200);
+        return;
+      }
+      loadBarFillEl.style.width = pct + "%";
+      const nextHint = Math.floor((pct/100) * LOAD_HINTS.length);
+      if(nextHint !== hintIdx && nextHint < LOAD_HINTS.length && loadHintEl){
+        hintIdx = nextHint;
+        loadHintEl.textContent = LOAD_HINTS[hintIdx];
+      }
+    }, 110);
+  }
+
+
+  const upgradeDefs = [
+    { id:"click1", name:"강한 손가락", desc:"클릭당 +1", baseCost:10, costMul:1.15, type:"click", power:1 },
+    { id:"click2", name:"근력 강화", desc:"클릭당 +5", baseCost:120, costMul:1.16, type:"click", power:5 },
+    { id:"click3", name:"파워 글러브", desc:"클릭당 +25", baseCost:1500, costMul:1.17, type:"click", power:25 },
+    { id:"click4", name:"메가 파워암", desc:"클릭당 +100", baseCost:15000, costMul:1.18, type:"click", power:100 },
+    { id:"auto1", name:"자동 태퍼", desc:"초당 +1", baseCost:50, costMul:1.15, type:"auto", power:1 },
+    { id:"auto2", name:"터치 로봇", desc:"초당 +8", baseCost:700, costMul:1.16, type:"auto", power:8 },
+    { id:"auto3", name:"양자 터치 엔진", desc:"초당 +50", baseCost:8000, costMul:1.17, type:"auto", power:50 },
+    { id:"auto4", name:"특이점 코어", desc:"초당 +300", baseCost:90000, costMul:1.18, type:"auto", power:300 },
+    { id:"speed1", name:"가속 장치", desc:"자동 생산 주기 -10%", baseCost:3000, costMul:1.20, type:"speed", power:0.10 },
+    { id:"speed2", name:"초고속 엔진", desc:"자동 생산 주기 -15%", baseCost:40000, costMul:1.20, type:"speed", power:0.15 },
+    { id:"mboost", name:"미션 증폭기", desc:"미션 보상 증폭", baseCost:6000, costMul:1.30, type:"mission", power:0.10 },
+    { id:"critc", name:"정밀 타격", desc:"크리티컬 확률 강화", baseCost:4000, costMul:1.22, type:"critChance", power:0.01, maxLevel:30 },
+    { id:"critm", name:"치명 강타", desc:"크리티컬 배율 강화", baseCost:6000, costMul:1.25, type:"critMult", power:0.25, maxLevel:20 },
+  ];
+
+  const achDefs = [
+    { id:"a1", name:"첫 터치", desc:"1번 클릭", check:s=>s.totalClicks>=1, ability:{type:"clickMult", value:0.02, label:"클릭당 +2%"} },
+    { id:"a2", name:"손가락에 불나요", desc:"100번 클릭", check:s=>s.totalClicks>=100, ability:{type:"clickMult", value:0.05, label:"클릭당 +5%"} },
+    { id:"a3", name:"부자의 길", desc:"1,000 점 달성", check:s=>s.total>=1000, ability:{type:"autoMult", value:0.08, label:"초당 생산 +8%"} },
+    { id:"a4", name:"자동화 시작", desc:"자동 생산 보유", check:s=>s.autoPerSec>0, ability:{type:"autoMult", value:0.04, label:"초당 생산 +4%"} },
+    { id:"a5", name:"터치의 전설", desc:"100,000 점 달성", check:s=>s.total>=100000, ability:{type:"clickMult", value:0.15, label:"클릭당 +15%"} },
+    { id:"a6", name:"환생의 시작", desc:"첫 환생 달성", check:s=>s.prestige>=1, ability:{type:"critChance", value:0.02, label:"크리티컬 확률 +2%p"} },
+    { id:"a7", name:"콤보의 달인", desc:"100 콤보 달성", check:s=>s.bestCombo>=100, ability:{type:"clickMult", value:0.10, label:"클릭당 +10%"} },
+    { id:"a8", name:"억만장자", desc:"1,000,000 점 달성", check:s=>s.total>=1000000, ability:{type:"costDiscount", value:0.10, label:"상점 가격 -10%"} },
+    { id:"r1", name:"첫 런", desc:"로그라이트 1판 완료", check:s=>(s.rogueRunsPlayed||0)>=1, ability:{type:"clickMult", value:0.03, label:"클릭당 +3%"} },
+    { id:"r2", name:"제법인데?", desc:"로그라이트 최고 기록 500점", check:s=>(s.rogueBest||0)>=500, ability:{type:"clickMult", value:0.05, label:"클릭당 +5%"} },
+    { id:"r3", name:"고수의 손길", desc:"로그라이트 최고 기록 2,000점", check:s=>(s.rogueBest||0)>=2000, ability:{type:"autoMult", value:0.15, label:"초당 생산 +15%"} },
+    { id:"r4", name:"전설의 손길", desc:"로그라이트 최고 기록 5,000점", check:s=>(s.rogueBest||0)>=5000, ability:{type:"clickMult", value:0.20, label:"클릭당 +20%"} },
+    { id:"r5", name:"신화를 만나다", desc:"로그라이트에서 신화 등급 버프 획득", check:s=>(s.rogueMythicCount||0)>=1, ability:{type:"critChance", value:0.015, label:"크리티컬 확률 +1.5%p"} },
+    { id:"r6", name:"베테랑 러너", desc:"로그라이트 10판 완료", check:s=>(s.rogueRunsPlayed||0)>=10, ability:{type:"costDiscount", value:0.08, label:"상점 가격 -8%"} },
+    { id:"m1", name:"초보 사냥꾼", desc:"몬스터 스테이지 10 도달", check:s=>(s.bestStage||1)>=10, ability:{type:"clickMult", value:0.04, label:"클릭당 +4%"} },
+    { id:"m2", name:"보스 슬레이어", desc:"몬스터 스테이지 30 도달", check:s=>(s.bestStage||1)>=30, ability:{type:"critChance", value:0.02, label:"크리티컬 확률 +2%p"} },
+    { id:"r7", name:"지옥 탐험가", desc:"로그라이트 지옥 난이도 1,500점", check:s=>((s.rogueBestDiff&&s.rogueBestDiff.hell)||0)>=1500, ability:{type:"clickMult", value:0.10, label:"클릭당 +10%"} },
+    { id:"egg1", name:"???", desc:"↑↑↓↓←→←→B A", check:s=>!!s.easterEggFound, ability:{type:"clickMult", value:0.07, label:"클릭당 +7%"} },
+    { id:"egg2", name:"????", desc:"메인 화면 제목을 연속으로 7번 눌러보세요", check:s=>!!s.titleEggFound, ability:{type:"autoMult", value:0.07, label:"초당 생산 +7%"} },
+  ];
+
+  let state = {
+    score:0, total:0, totalClicks:0,
+    clickPower:1, autoPerSec:0,
+    owned:{}, unlockedAch:{}, prestige:0, bestCombo:0, lastSave:0, equippedTitle:null,
+    dailyDate:"", dailyClicks:0, dailyScore:0, dailyCrits:0, dailyUpgradesBought:0, dailyClaims:{}, weeklyKey:"", weeklyClicks:0, weeklyScore:0, weeklyCrits:0, weeklyUpgradesBought:0, weeklyMissionsDone:0, weeklyClaims:{}, missionSkinUnlocked:false, missionDoneCount:{}, missionTotalClaims:0, easterEggFound:false, titleEggFound:false, stage:1, monsterHp:null, bestStage:1, kills:0, hunting:false, nick:"", rogueUnlocked:false, tutorialDone:false, pid:"", reduceEffects:false, vibrate:false, reduceEffects:false, vibrate:false,
+    equippedSkin:"default", coreShards:0, rogueBest:0, rogueBestDiff:{}, rogueRunsPlayed:0, rogueMythicCount:0
+  };
+  const PRESTIGE_BASE_LEVEL = 10;
+  const PRESTIGE_LEVEL_STEP = 10;
+  function prestigeLevelReq(){ return PRESTIGE_BASE_LEVEL + state.prestige * PRESTIGE_LEVEL_STEP; }
+
+  function todayStr(){
+    const d = new Date();
+    return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+  }
+
+  const MISSIONS = [
+    { id:"clicks", track:"dailyClicks", target:300, text:t=>`오늘 클릭 ${t}번 하기`,
+      reward:{type:"score", amount:500}, rewardLabel:"+500점" },
+    { id:"score", track:"dailyScore", target:5000, text:t=>`오늘 ${t.toLocaleString()}점 획득하기`,
+      reward:{type:"score", amount:1000}, rewardLabel:"+1,000점" },
+    { id:"crit", track:"dailyCrits", target:15, text:t=>`오늘 크리티컬 ${t}회 내기`,
+      reward:{type:"buff", mult:2, duration:60}, rewardLabel:"1분간 클릭파워 ×2" },
+    { id:"upgrades", track:"dailyUpgradesBought", target:5, text:t=>`오늘 업그레이드 ${t}단계 구매하기`,
+      reward:{type:"speed", mult:2, duration:60}, rewardLabel:"1분간 생산속도 ×2" },
+    { id:"skinmaster", track:"missionTotalClaims", target:50, text:t=>`미션 누적 ${t}개 완료하기`,
+      reward:{type:"skin"}, rewardLabel:"전용 스킨 \"미션 마스터\" 획득" },
+    { id:"w_clicks", weekly:true, track:"weeklyClicks", target:3000, text:t=>`이번 주 클릭 ${t.toLocaleString()}번 하기`,
+      reward:{type:"score", amount:5000}, rewardLabel:"+5,000점" },
+    { id:"w_score", weekly:true, track:"weeklyScore", target:50000, text:t=>`이번 주 ${t.toLocaleString()}점 획득하기`,
+      reward:{type:"buff", mult:2, duration:180}, rewardLabel:"3분간 클릭파워 ×2" },
+    { id:"w_crit", weekly:true, track:"weeklyCrits", target:150, text:t=>`이번 주 크리티컬 ${t}회 내기`,
+      reward:{type:"score", amount:8000}, rewardLabel:"+8,000점" },
+    { id:"w_clears", weekly:true, track:"weeklyMissionsDone", target:10, text:t=>`이번 주 일일 미션 ${t}개 완료하기`,
+      reward:{type:"score", amount:10000}, rewardLabel:"+10,000점" },
+    { id:"w_upgrades", weekly:true, track:"weeklyUpgradesBought", target:40, text:t=>`이번 주 업그레이드 ${t}단계 구매하기`,
+      reward:{type:"speed", mult:2, duration:180}, rewardLabel:"3분간 생산속도 ×2" },
+  ];
+  function checkDailyReset(){
+    const t = todayStr();
+    if(state.dailyDate !== t){
+      state.dailyDate = t;
+      state.dailyClicks = 0;
+      state.dailyScore = 0;
+      state.dailyCrits = 0;
+      state.dailyUpgradesBought = 0;
+      state.dailyClaims = {};
+    }
+    checkWeeklyReset();
+  }
+  function weekKey(){
+    const d = new Date();
+    const back = (d.getDay()+6)%7; // Monday = 0
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate()-back);
+    return mon.getFullYear()+"-"+(mon.getMonth()+1)+"-"+mon.getDate();
+  }
+  function weekDaysLeft(){ return 7 - ((new Date().getDay()+6)%7); }
+  function checkWeeklyReset(){
+    const k = weekKey();
+    if(state.weeklyKey !== k){
+      state.weeklyKey = k;
+      state.weeklyClicks = 0;
+      state.weeklyScore = 0;
+      state.weeklyCrits = 0;
+      state.weeklyUpgradesBought = 0;
+      state.weeklyMissionsDone = 0;
+      state.weeklyClaims = {};
+    }
+  }
+
+  const SKINS = [
+    { id:"default", name:"기본 그린", unlock:()=>true, c1:"#39ff9e", c2:"#0fae6c",
+      ability:{type:"clickMult", value:0.02, label:"클릭당 +2%"} },
+    { id:"blue", name:"아이스 블루",
+      unlockDesc:s=>`'클릭' 미션 ${Math.min((s.missionDoneCount&&s.missionDoneCount.clicks)||0,3)}/3회 완료`,
+      progressPct:s=>Math.min(100, (((s.missionDoneCount&&s.missionDoneCount.clicks)||0)/3)*100),
+      unlock:s=>((s.missionDoneCount&&s.missionDoneCount.clicks)||0)>=3, c1:"#39c9ff", c2:"#0f6fae",
+      ability:{type:"autoMult", value:0.10, label:"초당 생산 +10%"} },
+    { id:"purple", name:"로열 퍼플",
+      unlockDesc:s=>`'점수' 미션 ${Math.min((s.missionDoneCount&&s.missionDoneCount.score)||0,3)}/3회 완료`,
+      progressPct:s=>Math.min(100, (((s.missionDoneCount&&s.missionDoneCount.score)||0)/3)*100),
+      unlock:s=>((s.missionDoneCount&&s.missionDoneCount.score)||0)>=3, c1:"#b26bff", c2:"#6a1fae",
+      ability:{type:"clickMult", value:0.08, label:"클릭당 +8%"} },
+    { id:"gold", name:"골든",
+      unlockDesc:s=>`'크리티컬' 미션 ${Math.min((s.missionDoneCount&&s.missionDoneCount.crit)||0,3)}/3회 완료`,
+      progressPct:s=>Math.min(100, (((s.missionDoneCount&&s.missionDoneCount.crit)||0)/3)*100),
+      unlock:s=>((s.missionDoneCount&&s.missionDoneCount.crit)||0)>=3, c1:"#ffe14d", c2:"#c98a00",
+      ability:{type:"costDiscount", value:0.06, label:"상점 가격 -6%"} },
+    { id:"crimson", name:"크림슨",
+      unlockDesc:s=>`'업그레이드' 미션 ${Math.min((s.missionDoneCount&&s.missionDoneCount.upgrades)||0,5)}/5회 완료`,
+      progressPct:s=>Math.min(100, (((s.missionDoneCount&&s.missionDoneCount.upgrades)||0)/5)*100),
+      unlock:s=>((s.missionDoneCount&&s.missionDoneCount.upgrades)||0)>=5, c1:"#ff4d6a", c2:"#a80f2e",
+      ability:{type:"critChance", value:0.04, label:"크리티컬 확률 +4%p"} },
+    { id:"mission", name:"미션 마스터",
+      unlockDesc:s=>`미션 누적 ${Math.min(Object.values(s.missionDoneCount||{}).reduce((a,b)=>a+b,0),50)}/50회 완료`,
+      unlock:s=>Object.values(s.missionDoneCount||{}).reduce((a,b)=>a+b,0)>=50, c1:"#ffffff", c2:"#8fd3ff",
+      ability:{type:"clickMult", value:0.12, label:"클릭당 +12%"} },
+  ];
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(raw){ Object.assign(state, JSON.parse(raw)); }
+    }catch(e){}
+    checkDailyReset();
+  }
+  function save(){
+    if(window.__updating) return;
+    try{ state.lastSave = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){}
+    scheduleBoardSync();
+  }
+
+  function costFor(def){
+    const owned = state.owned[def.id] || 0;
+    return Math.ceil(def.baseCost * Math.pow(def.costMul, owned));
+  }
+
+  let buyQty = 1;
+  function costForN(def, qty){
+    const owned = state.owned[def.id] || 0;
+    let total = 0;
+    for(let i=0;i<qty;i++){
+      total += Math.ceil(def.baseCost * Math.pow(def.costMul, owned+i));
+    }
+    const discount = titleBonus("costDiscount") + skinBonus("costDiscount");
+    if(discount>0) total = Math.ceil(total * (1-discount));
+    return total;
+  }
+
+  const NUM_UNITS = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+  function fmt(n){
+    if(!isFinite(n)) return "∞";
+    if(n < 1000) return Math.floor(n).toString();
+    let idx = Math.floor(Math.log10(n) / 3);
+    if(idx >= NUM_UNITS.length) return n.toExponential(2).replace("e+", "e");
+    let v = n / Math.pow(10, idx * 3);
+    if(v.toFixed(2) >= 1000 && idx + 1 < NUM_UNITS.length){ idx++; v = n / Math.pow(10, idx * 3); }
+    return v.toFixed(idx === 1 ? 1 : 2) + NUM_UNITS[idx];
+  }
+
+  function levelFor(total){
+    // level threshold grows: 100 * 1.35^(lv-1)
+    let lv = 1, need = 100, acc = 0;
+    while(acc + need <= total){ acc += need; lv++; need = Math.ceil(100 * Math.pow(1.35, lv-1)); }
+    return { lv, into: total - acc, need };
+  }
+
+  const TITLES = [
+    { lv:1, name:"초보 터처" },
+    { lv:5, name:"숙련 터처" },
+    { lv:10, name:"터치 장인" },
+    { lv:20, name:"손가락의 신" },
+    { lv:35, name:"전설의 터처" },
+  ];
+  function titleFor(lv){
+    let t = TITLES[0].name;
+    for(const item of TITLES){ if(lv >= item.lv) t = item.name; }
+    return t;
+  }
+
+  function equippedTitleDef(){
+    if(!state.equippedTitle) return null;
+    if(!state.unlockedAch[state.equippedTitle]) return null;
+    return achDefs.find(d=>d.id===state.equippedTitle) || null;
+  }
+  function titleBonus(kind){
+    const t = equippedTitleDef();
+    if(t && t.ability && t.ability.type===kind) return t.ability.value;
+    return 0;
+  }
+  function skinBonus(kind){
+    const sk = SKINS.find(x=>x.id===state.equippedSkin);
+    if(sk && sk.unlock(state) && sk.ability && sk.ability.type===kind) return sk.ability.value;
+    return 0;
+  }
+
+  function prestigeMult(){ return 1 + state.prestige*1; }
+  let tempClickBuffMult = 1, tempClickBuffUntil = 0;
+  function activeTempClickMult(){ return Date.now() < tempClickBuffUntil ? tempClickBuffMult : 1; }
+  let tempSpeedBuffMult = 1, tempSpeedBuffUntil = 0;
+  function activeTempSpeedMult(){ return Date.now() < tempSpeedBuffUntil ? tempSpeedBuffMult : 1; }
+  function effClick(){
+    return Math.max(1, Math.round(state.clickPower * prestigeMult() * (1+titleBonus("clickMult")+skinBonus("clickMult")) * activeTempClickMult()));
+  }
+  function effAuto(){ return Math.round(state.autoPerSec * prestigeMult() * (1+titleBonus("autoMult")+skinBonus("autoMult"))); }
+
+  let soundMuted = false;
+  function fxOk(){ return !state.reduceEffects; }
+  function doVibrate(ms){ if(state.vibrate && navigator.vibrate) navigator.vibrate(ms); }
+  function beep(freq, dur, type, vol){
+    if(soundMuted) return;
+    try{
+      if(!window._actx) window._actx = new (window.AudioContext||window.webkitAudioContext)();
+      const ctx = window._actx;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type||"sine"; o.frequency.value = freq; g.gain.value = vol!=null?vol:0.05;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (dur||0.05));
+      o.stop(ctx.currentTime + (dur||0.05) + 0.02);
+    }catch(e){}
+  }
+
+  const scoreEl = document.getElementById("score");
+  const rateEl = document.getElementById("rate");
+  const touchBtn = document.getElementById("touchBtn");
+  const shopTab = document.getElementById("shopTab");
+  const qtyRowEl = document.getElementById("qtyRow");
+  const achTab = document.getElementById("achTab");
+  const skinTab = document.getElementById("skinTab");
+  const prestigeTab = document.getElementById("prestigeTab");
+  const statsTab = document.getElementById("statsTab");
+  const modalOverlayEl = document.getElementById("modalOverlay");
+  const modalTextEl = document.getElementById("modalText");
+  const modalConfirmEl = document.getElementById("modalConfirm");
+  const modalCancelEl = document.getElementById("modalCancel");
+
+  function showConfirm(text, onConfirm){
+    modalTextEl.textContent = text;
+    modalOverlayEl.classList.add("show");
+    function cleanup(){
+      modalOverlayEl.classList.remove("show");
+      modalConfirmEl.removeEventListener("click", onOk);
+      modalCancelEl.removeEventListener("click", onCancel);
+    }
+    function onOk(){ cleanup(); onConfirm(); }
+    function onCancel(){ cleanup(); }
+    modalConfirmEl.addEventListener("click", onOk);
+    modalCancelEl.addEventListener("click", onCancel);
+  }
+  const lvNumEl = document.getElementById("lvNum");
+  const titleNameEl = document.getElementById("titleName");
+  const prestigeNumEl = document.getElementById("prestigeNum");
+  const missionTab = document.getElementById("missionTab");
+  const touchWrapEl = document.getElementById("touchWrap");
+  const nextLvEl = document.getElementById("nextLv");
+  const xpFillEl = document.getElementById("xpFill");
+  const comboEl = document.getElementById("combo");
+  const flashEl = document.getElementById("flash");
+  const upToastEl = document.getElementById("upToast");
+  const ringPulseEl = document.getElementById("ringPulse");
+  const scoreWrapEl = document.getElementById("score");
+  const prestigeToastEl = document.getElementById("prestigeToast");
+  const stageEl = document.querySelector(".stage");
+
+  function critChanceUpg(){ return (state.owned["critc"]||0) * 0.01; }
+  function critMultNormal(){ return 5 + (state.owned["critm"]||0) * 0.25; }
+  function allowedQty(def, qty){
+    if(def.type === "speed") return speedBuyQty(def, qty);
+    if(def.maxLevel) return Math.max(0, Math.min(qty, def.maxLevel - (state.owned[def.id]||0)));
+    return qty;
+  }
+  function missionBoost(){ return (state.owned["mboost"]||0) * 0.10; }
+  function missionScoreMult(){ return 1 + missionBoost(); }
+  function missionDurMult(){ return 1 + missionBoost()*0.5; }
+  function fmtDur(sec){ return (sec >= 60 && sec % 60 === 0) ? `${sec/60}분간` : `${sec}초간`; }
+  function rewardInfo(m){
+    const r = m.reward;
+    if(r.type === "score"){
+      const amount = Math.round(r.amount * missionScoreMult());
+      return { amount, label:`+${amount.toLocaleString()}점` };
+    }
+    if(r.type === "buff" || r.type === "speed"){
+      const sec = Math.round(r.duration * missionDurMult());
+      return { duration:sec, label:`${fmtDur(sec)} ${r.type === "buff" ? "클릭파워" : "생산속도"} ×${r.mult}` };
+    }
+    return { label:m.rewardLabel };
+  }
+
+  function descFor(def){
+    if(def.type === "critChance"){
+      const lv = state.owned[def.id]||0;
+      return lv >= def.maxLevel ? `크리티컬 확률 +${lv}%p (최대)` : `확률 +1%p (현재 +${lv}%p / 최대 +${def.maxLevel}%p)`;
+    }
+    if(def.type === "critMult"){
+      const lv = state.owned[def.id]||0;
+      return lv >= def.maxLevel ? `크리티컬 배율 ×${critMultNormal().toFixed(2)} (최대)` : `배율 +0.25 (현재 ×${critMultNormal().toFixed(2)} / 최대 ×${(5+def.maxLevel*0.25).toFixed(2)})`;
+    }
+    if(def.type === "mission"){
+      return `미션 점수 +10% · 지속 +5% (현재 +${Math.round(missionBoost()*100)}%)`;
+    }
+    if(def.type === "speed"){
+      return speedMaxed()
+        ? `생산 주기 최대치 도달 (${TICK_FLOOR_MS}ms)`
+        : `생산 주기 -${Math.round(def.power*100)}% (현재 ${autoTickMs()}ms · 최대 ${TICK_FLOOR_MS}ms)`;
+    }
+    const bonusKind = def.type === "click" ? "clickMult" : "autoMult";
+    const effPower = Math.round(def.power * prestigeMult() * (1+titleBonus(bonusKind)));
+    const unit = def.type === "click" ? "클릭당" : "초당";
+    return `${unit} +${fmt(effPower)}`;
+  }
+
+  const TICK_FLOOR_MS = 150;
+  function baseTickMs(l1, l2){ return 1000 * Math.pow(0.90, l1) * Math.pow(0.85, l2); }
+  function autoTickMs(){
+    const ms = baseTickMs(state.owned["speed1"]||0, state.owned["speed2"]||0) / activeTempSpeedMult();
+    return Math.max(TICK_FLOOR_MS, Math.round(ms));
+  }
+  // 150ms is the max level: no more speed levels can be bought once the base interval reaches it
+  function speedBuyQty(def, qty){
+    const o = { speed1: state.owned["speed1"]||0, speed2: state.owned["speed2"]||0 };
+    if(baseTickMs(o.speed1, o.speed2) <= TICK_FLOOR_MS) return 0;
+    let k = 0;
+    while(k < qty){
+      o[def.id]++; k++;
+      if(baseTickMs(o.speed1, o.speed2) <= TICK_FLOOR_MS) break;
+    }
+    return k;
+  }
+  function speedMaxed(){ return baseTickMs(state.owned["speed1"]||0, state.owned["speed2"]||0) <= TICK_FLOOR_MS; }
+
+  const GROUP_ORDER = ["click","auto","speed","crit","mission"];
+  const GROUP_LABEL = { click:"👆 클릭 파워", auto:"🤖 자동 생산", speed:"⚡ 생산 속도", crit:"💥 크리티컬", mission:"🎯 미션" };
+  function groupOf(def){
+    if(def.type === "critChance" || def.type === "critMult") return "crit";
+    return def.type;
+  }
+  function renderShop(){
+    const keepScroll = shopTab.scrollTop;
+    shopTab.innerHTML = "";
+    const sortedDefs = upgradeDefs.slice().sort((a,b)=>GROUP_ORDER.indexOf(groupOf(a)) - GROUP_ORDER.indexOf(groupOf(b)));
+    let lastGroup = null;
+    sortedDefs.forEach(def=>{
+      const g = groupOf(def);
+      if(g !== lastGroup){
+        lastGroup = g;
+        const h = document.createElement("div");
+        h.className = "shopHead";
+        h.textContent = GROUP_LABEL[g] || g;
+        shopTab.appendChild(h);
+      }
+      const q = allowedQty(def, buyQty);
+      const maxed = q === 0;
+      const cost = maxed ? 0 : costForN(def, q);
+      const owned = state.owned[def.id] || 0;
+      const el = document.createElement("div");
+      el.className = "item" + (!maxed && state.score >= cost ? " canBuy" : "") + (maxed ? " maxed" : "");
+      el.innerHTML = `
+        <div class="info">
+          <div class="name">${def.name} ${owned>0? `<span style="color:var(--sub);font-weight:400;">Lv.${owned}</span>`:""}</div>
+          <div class="desc">${descFor(def)}</div>
+        </div>
+        <button ${maxed || state.score < cost ? "disabled":""}>${maxed ? "MAX" : fmt(cost) + (q>1?` (x${q})`:"")}</button>
+      `;
+      el.querySelector("button").addEventListener("click", ()=>buy(def, buyQty));
+      shopTab.appendChild(el);
+    });
+    shopTab.scrollTop = keepScroll;
+  }
+
+  function equipTitle(id){
+    state.equippedTitle = (state.equippedTitle === id) ? null : id;
+    renderAch(); renderShop(); updateUI(); save();
+  }
+
+  function renderAch(){
+    achTab.innerHTML = "";
+    achDefs.forEach(def=>{
+      const done = !!state.unlockedAch[def.id];
+      const isEquipped = state.equippedTitle === def.id;
+      const el = document.createElement("div");
+      el.className = "achItem" + (done?" done":"") + (isEquipped?" equipped":"");
+      el.innerHTML = `
+        <div><span class="achName">${done?"✔":"🔒"} ${def.name}</span></div>
+        <div class="achDesc">${def.desc}</div>
+        <div class="achAbility">✦ ${def.ability.label}</div>
+        <button class="equipBtn" ${done?"":"disabled"}>${isEquipped ? "장착됨 (해제)" : "장착하기"}</button>
+      `;
+      if(done){
+        el.querySelector(".equipBtn").addEventListener("click", ()=>equipTitle(def.id));
+      }
+      achTab.appendChild(el);
+    });
+  }
+
+  function upgradeImpact(def){
+    // screen flash
+    if(fxOk()){ flashEl.classList.remove("go","gold"); void flashEl.offsetWidth; flashEl.classList.add("go"); }
+    // ring pulse from touch button
+    ringPulseEl.classList.remove("go"); void ringPulseEl.offsetWidth; ringPulseEl.classList.add("go");
+    // score pop
+    scoreWrapEl.classList.remove("bought"); void scoreWrapEl.offsetWidth; scoreWrapEl.classList.add("bought");
+    // toast text
+    clearTimeout(upgradeImpact._hideT);
+    clearTimeout(upgradeImpact._goT);
+    upToastEl.textContent = `⬆ ${def.name} 강화!`;
+    upToastEl.classList.remove("show","hide");
+    upToastEl.classList.add("go");
+    upgradeImpact._goT = setTimeout(()=>{
+      upToastEl.classList.remove("go");
+      upToastEl.classList.add("show");
+    }, 10);
+    upgradeImpact._hideT = setTimeout(()=>{
+      upToastEl.classList.remove("show");
+      upToastEl.classList.add("hide");
+    }, 1100);
+  }
+
+  function buy(def, qty){
+    qty = qty || 1;
+    qty = allowedQty(def, qty);
+    if(qty === 0) return;
+    const cost = costForN(def, qty);
+    if(state.score < cost) return;
+    state.score -= cost;
+    state.owned[def.id] = (state.owned[def.id]||0) + qty;
+    checkDailyReset();
+    state.dailyUpgradesBought += qty;
+    state.weeklyUpgradesBought += qty;
+    if(def.type === "click") state.clickPower += def.power*qty;
+    else if(def.type === "auto") state.autoPerSec += def.power*qty;
+    renderShop();
+    updateUI();
+    checkAch();
+    upgradeImpact(def);
+    if(def.type === "speed") startAutoTick();
+    updateMissionBadge();
+    save();
+  }
+
+  function checkAch(){
+    checkRogueUnlock();
+    let changed = false;
+    achDefs.forEach(def=>{
+      if(!state.unlockedAch[def.id] && def.check(state)){
+        state.unlockedAch[def.id] = true;
+        changed = true;
+      }
+    });
+    if(changed) renderAch();
+  }
+
+  function renderPrestige(){
+    const curLv = levelFor(state.total).lv;
+    const req = prestigeLevelReq();
+    const canPrestige = curLv >= req;
+    let box = prestigeTab.querySelector(".prestigeBox");
+    if(!box){
+      box = document.createElement("div");
+      box.className = "prestigeBox";
+      box.innerHTML = `
+        <div class="pTitle" id="pTitle"></div>
+        <div class="pDesc" id="pDesc"></div>
+        <button id="prestigeBtn">환생하기</button>
+      `;
+      prestigeTab.appendChild(box);
+      box.querySelector("#prestigeBtn").addEventListener("click", doPrestige);
+    }
+    box.querySelector("#pTitle").textContent = `환생 Lv.${state.prestige} · 배율 x${state.prestige}`;
+    box.querySelector("#pDesc").textContent = canPrestige
+      ? "환생하면 점수와 업그레이드가 모두 초기화되지만, 그 대신 영구 배율이 +1 늘어나서 다음 판이 훨씬 빨라져요."
+      : `캐릭터 LV ${req}를 달성하면 환생할 수 있어요. (현재 LV ${curLv} / ${req}) 환생할수록 다음 환생에 필요한 레벨이 올라갑니다. 업그레이드를 사서 점수를 빨리 모을수록 레벨이 오릅니다.`;
+    box.querySelector("#prestigeBtn").disabled = !canPrestige;
+  }
+
+  function renderMission(){
+    checkDailyReset();
+    missionTab.innerHTML = "";
+    const claimable = { daily:0, weekly:0, skin:0 };
+    const deferredBoxes = [];
+    MISSIONS.forEach(m=>{
+      const c = m.weekly ? "weekly" : (m.id === "skinmaster" ? "skin" : "daily");
+      const pr = m.id === "skinmaster" ? (state.missionTotalClaims||0) : state[m.track];
+      const cl = m.id === "skinmaster" ? !!state.missionSkinUnlocked : (m.weekly ? !!state.weeklyClaims[m.id] : !!state.dailyClaims[m.id]);
+      if(pr >= m.target && !cl) claimable[c]++;
+    });
+    document.querySelectorAll(".subBtn").forEach(b=>{
+      const k = b.dataset.sub;
+      b.classList.toggle("active", k === missionSub);
+      b.classList.toggle("alert", claimable[k] > 0);
+      b.textContent = SUB_LABELS[k] + (claimable[k] > 0 ? " ●" + claimable[k] : "");
+    });
+    MISSIONS.forEach(m=>{
+      const cat = m.weekly ? "weekly" : (m.id === "skinmaster" ? "skin" : "daily");
+      if(cat !== missionSub) return;
+      const progress = m.id === "skinmaster"
+        ? Math.min(state.missionTotalClaims||0, m.target)
+        : Math.min(state[m.track], m.target);
+      const done = progress >= m.target;
+      const claimed = m.id === "skinmaster" ? !!state.missionSkinUnlocked : (m.weekly ? !!state.weeklyClaims[m.id] : !!state.dailyClaims[m.id]);
+      const box = document.createElement("div");
+      const isSpecial = m.id === "skinmaster";
+      box.className = "missionBox" + (isSpecial ? " missionSpecial" : "") + (m.weekly ? " missionWeekly" : "");
+      const doneCount = (state.missionDoneCount && state.missionDoneCount[m.id]) || 0;
+      box.innerHTML = `
+        ${isSpecial ? `<div class="missionSpecialTag">★ 특별 미션</div>` : ""}
+        ${m.weekly ? `<div class="missionWeeklyTag">📅 주간 미션</div>` : ""}
+        <div class="missionText">${isSpecial ? "👑 " : ""}${m.text(m.target)}</div>
+        <div class="missionReward">보상: ${rewardInfo(m).label}${missionBoost() > 0 && m.reward.type !== "skin" ? " ✦" : ""}</div>
+        <div class="missionLifetime">${m.weekly ? `이번 주 남은 기간 ${weekDaysLeft()}일` : `지금까지 ${doneCount}회 완료`}</div>
+        <div class="missionBarBg"><div class="missionBarFill" style="width:${Math.min(100,(progress/m.target)*100)}%"></div></div>
+        <button class="missionClaim ${done && !claimed ? "ready":""} ${claimed?"claimed":""}" ${claimed || !done ? "disabled":""}>
+          ${claimed ? "완료" : (done ? "받기" : `${progress}/${m.target}`)}
+        </button>
+      `;
+      if(done && !claimed){
+        box.querySelector(".missionClaim").addEventListener("click", ()=>claimMission(m.id));
+      }
+      if(m.id === "skinmaster") deferredBoxes.push(box); else missionTab.appendChild(box);
+    });
+
+    SKINS.forEach(skin=>{
+      if(missionSub !== "skin" || !skin.unlockDesc || skin.id === "mission") return; // skip default + mission-master (already shown above)
+      const unlocked = skin.unlock(state);
+      const box = document.createElement("div");
+      box.className = "missionBox skinMilestone" + (unlocked?" unlocked":"");
+      const pct = unlocked ? 100 : (skin.progressPct ? skin.progressPct(state) : 0);
+      box.innerHTML = `
+        <div class="missionText">🎨 스킨: ${skin.name}</div>
+        <div class="missionReward">${skin.unlockDesc(state)}</div>
+        <div class="missionLifetime">${skin.ability ? "✦ "+skin.ability.label : ""}</div>
+        <div class="missionBarBg"><div class="missionBarFill" style="width:${pct}%"></div></div>
+        <button class="missionClaim ${unlocked?"claimed":""}" disabled>${unlocked?"해금됨":"자동 해금"}</button>
+      `;
+      missionTab.appendChild(box);
+    });
+    deferredBoxes.forEach(b=>missionTab.appendChild(b));
+    updateMissionBadge();
+  }
+
+  function claimMission(id){
+    checkDailyReset();
+    const m = MISSIONS.find(x=>x.id===id);
+    const prog = id === "skinmaster" ? (state.missionTotalClaims||0) : state[m.track];
+    const alreadyClaimed = id === "skinmaster" ? !!state.missionSkinUnlocked : (m.weekly ? !!state.weeklyClaims[id] : !!state.dailyClaims[id]);
+    if(!m || alreadyClaimed || prog < m.target) return;
+    const missionLabel = m.weekly ? "주간" : "일일";
+    if(m.weekly){
+      state.weeklyClaims[id] = true;
+    } else if(id !== "skinmaster"){
+      state.dailyClaims[id] = true;
+      state.weeklyMissionsDone += 1;
+    }
+    state.missionDoneCount[id] = (state.missionDoneCount[id]||0) + 1;
+    state.missionTotalClaims = (state.missionTotalClaims||0) + 1;
+    let toastMsg;
+    const info = rewardInfo(m);
+    if(m.reward.type === "score"){
+      state.score += info.amount;
+      state.total += info.amount;
+      toastMsg = `🎯 ${missionLabel} 미션 완료! +${fmt(info.amount)}`;
+    } else if(m.reward.type === "buff"){
+      tempClickBuffMult = m.reward.mult;
+      tempClickBuffUntil = Date.now() + info.duration*1000;
+      toastMsg = `🎯 ${missionLabel} 미션 완료! ${info.duration}초간 클릭파워 ×${m.reward.mult}`;
+    } else if(m.reward.type === "speed"){
+      tempSpeedBuffMult = m.reward.mult;
+      tempSpeedBuffUntil = Date.now() + info.duration*1000;
+      startAutoTick();
+      setTimeout(startAutoTick, info.duration*1000 + 50);
+      toastMsg = `🎯 ${missionLabel} 미션 완료! ${info.duration}초간 생산속도 ×${m.reward.mult}`;
+    } else if(m.reward.type === "skin"){
+      state.missionSkinUnlocked = true;
+      renderSkins();
+      toastMsg = `🎯 ${missionLabel} 미션 완료! 전용 스킨 "미션 마스터" 획득!`;
+    }
+    updateUI(); renderShop(); checkAch(); renderPrestige(); renderStats(); renderMission();
+    if(fxOk()){ flashEl.classList.remove("go","gold"); void flashEl.offsetWidth; flashEl.classList.add("go"); }
+    scoreWrapEl.classList.remove("bought"); void scoreWrapEl.offsetWidth; scoreWrapEl.classList.add("bought");
+    beep(700,.15,"triangle",.06);
+    clearTimeout(claimMission._hideT); clearTimeout(claimMission._goT);
+    upToastEl.textContent = toastMsg;
+    upToastEl.classList.remove("show","hide");
+    upToastEl.classList.add("go");
+    claimMission._goT = setTimeout(()=>{
+      upToastEl.classList.remove("go");
+      upToastEl.classList.add("show");
+    }, 10);
+    claimMission._hideT = setTimeout(()=>{
+      upToastEl.classList.remove("show");
+      upToastEl.classList.add("hide");
+    }, 1200);
+    save();
+  }
+
+  function applySkin(){
+    const skin = SKINS.find(s=>s.id===state.equippedSkin) || SKINS[0];
+    touchWrapEl.style.setProperty("--accent", skin.c1);
+    touchWrapEl.style.setProperty("--accent2", skin.c2);
+  }
+
+  function selectSkin(id){
+    const skin = SKINS.find(s=>s.id===id);
+    if(!skin || !skin.unlock(state)) return;
+    state.equippedSkin = (state.equippedSkin === id) ? "default" : id;
+    applySkin();
+    renderSkins();
+    save();
+  }
+
+  function renderSkins(){
+    skinTab.innerHTML = "";
+    SKINS.forEach(skin=>{
+      const unlocked = skin.unlock(state);
+      const isEquipped = state.equippedSkin === skin.id;
+      const el = document.createElement("div");
+      el.className = "skinItem" + (unlocked?" done":"") + (isEquipped?" equipped":"");
+      el.innerHTML = `
+        <div class="swatch" style="background:linear-gradient(135deg, ${skin.c1}, ${skin.c2});"></div>
+        <div class="skinName">${unlocked?"":"🔒 "}${skin.name}</div>
+        ${skin.ability ? `<div class="skinAbility">✦ ${skin.ability.label}</div>` : ""}
+        ${!unlocked && skin.unlockDesc ? `<div class="skinUnlockHint">${skin.unlockDesc(state)}</div>` : ""}
+        <button class="equipBtn" ${unlocked?"":"disabled"}>${isEquipped ? "장착됨" : "장착하기"}</button>
+      `;
+      if(unlocked){
+        el.querySelector(".equipBtn").addEventListener("click", ()=>selectSkin(skin.id));
+      }
+      skinTab.appendChild(el);
+    });
+  }
+
+  function renderStats(){
+    const lv = levelFor(state.total).lv;
+    const rows = [
+      ["칭호", (equippedTitleDef() ? equippedTitleDef().name : titleFor(lv))],
+      ["총 클릭 수", fmt(state.totalClicks) + "회"],
+      ["누적 획득 점수", fmt(state.total)],
+      ["환생 횟수", state.prestige + "회"],
+      ["현재 배율", "×" + state.prestige],
+      ["최고 콤보", state.bestCombo + " 콤보"],
+      ["최고 스테이지", (state.bestStage||1) + "단계"],
+      ["몬스터 처치", fmt(state.kills||0) + "마리"],
+    ];
+    statsTab.innerHTML = rows.map(([k,v])=>`
+      <div class="item" style="flex-basis:150px;">
+        <div class="info"><div class="name">${k}</div></div>
+        <div class="desc" style="font-size:.8rem;color:var(--text);font-weight:800;">${v}</div>
+      </div>
+    `).join("");
+  }
+
+  function prestigeImpact(){
+    if(fxOk()){ flashEl.classList.remove("go","gold"); void flashEl.offsetWidth;
+    flashEl.classList.add("gold","go"); }
+    if(fxOk()){
+      stageEl.classList.remove("shake"); void stageEl.offsetWidth; stageEl.classList.add("shake");
+      setTimeout(()=>stageEl.classList.remove("shake"), 520);
+    }
+    ringPulseEl.classList.remove("go"); void ringPulseEl.offsetWidth; ringPulseEl.classList.add("go");
+    beep(500,.2,"triangle",.07);
+    setTimeout(()=>beep(760,.2,"triangle",.08), 130);
+    setTimeout(()=>beep(1000,.35,"triangle",.09), 260);
+    clearTimeout(prestigeImpact._hideT);
+    clearTimeout(prestigeImpact._goT);
+    prestigeToastEl.textContent = `🌟 환생 완료! 배율 ×${state.prestige}`;
+    prestigeToastEl.classList.remove("show","hide");
+    prestigeImpact._goT = setTimeout(()=>{
+      prestigeToastEl.classList.add("show");
+    }, 10);
+    prestigeImpact._hideT = setTimeout(()=>{
+      prestigeToastEl.classList.remove("show");
+      prestigeToastEl.classList.add("hide");
+    }, 1800);
+  }
+
+  function doPrestige(){
+    if(levelFor(state.total).lv < prestigeLevelReq()) return;
+    showConfirm("환생하면 점수와 업그레이드가 초기화됩니다. 영구 배율이 늘어납니다. 진행할까요?", ()=>{
+      state.prestige += 1;
+      state.score = 0; state.total = 0;
+      state.clickPower = 1; state.autoPerSec = 0;
+      state.owned = {};
+      state.stage = 1; state.monsterHp = null;
+      initMonster();
+      state.missionSkinUnlocked = false;
+      if(state.equippedSkin === "mission") state.equippedSkin = "default";
+      applySkin(); renderSkins();
+      renderShop(); renderPrestige(); renderStats(); updateUI(); save();
+      prestigeImpact();
+    });
+  }
+
+  let lastLvShown = null;
+  function showLevelUp(lv){
+    prestigeToastEl.textContent = `⭐ LEVEL UP!  LV ${lv}`;
+    prestigeToastEl.classList.remove("hide");
+    prestigeToastEl.classList.add("show");
+    clearTimeout(showLevelUp._t);
+    showLevelUp._t = setTimeout(()=>{
+      prestigeToastEl.classList.remove("show");
+      prestigeToastEl.classList.add("hide");
+    }, 1500);
+    flashEl.classList.remove("go","gold"); void flashEl.offsetWidth; flashEl.classList.add("go");
+    beep(523,.09,"triangle",.06);
+    setTimeout(()=>beep(659,.09,"triangle",.06), 90);
+    setTimeout(()=>beep(784,.16,"triangle",.07), 180);
+  }
+
+  function updateUI(){
+    scoreEl.textContent = fmt(state.score);
+    const buffLeft = Math.max(0, Math.ceil((tempClickBuffUntil - Date.now())/1000));
+    const speedLeft = Math.max(0, Math.ceil((tempSpeedBuffUntil - Date.now())/1000));
+    rateEl.textContent = `클릭당 +${fmt(effClick())} · 초당 +${fmt(effAuto())}`
+      + (buffLeft>0 ? ` · ⚡×${tempClickBuffMult} (${buffLeft}초)` : "")
+      + (speedLeft>0 ? ` · 🚀×${tempSpeedBuffMult} (${speedLeft}초)` : "");
+    const { lv, into, need } = levelFor(state.total);
+    if(lastLvShown === null || !normalStageDisplayed()){
+      lastLvShown = lv;
+    } else if(lv > lastLvShown){
+      lastLvShown = lv;
+      showLevelUp(lv);
+    } else if(lv < lastLvShown){
+      lastLvShown = lv;
+    }
+    lvNumEl.textContent = lv;
+    nextLvEl.textContent = `다음 LV까지 ${fmt(need-into)}`;
+    xpFillEl.style.width = Math.min(100, (into/need)*100) + "%";
+    const eqT = equippedTitleDef();
+    titleNameEl.textContent = eqT ? eqT.name : titleFor(lv);
+    prestigeNumEl.textContent = state.prestige;
+  }
+
+  let comboCount = 0, comboTimer = null;
+  function comboMult(){ return 1 + comboCount*0.01; }
+
+  function comboMilestoneImpact(count){
+    if(fxOk()){ flashEl.classList.remove("go","gold"); void flashEl.offsetWidth; flashEl.classList.add("go"); }
+    ringPulseEl.classList.remove("go"); void ringPulseEl.offsetWidth; ringPulseEl.classList.add("go");
+    scoreWrapEl.classList.remove("bought"); void scoreWrapEl.offsetWidth; scoreWrapEl.classList.add("bought");
+    beep(1000,.3,"sawtooth",.09);
+    clearTimeout(comboMilestoneImpact._hideT);
+    clearTimeout(comboMilestoneImpact._goT);
+    upToastEl.textContent = `${count} COMBO!!`;
+    upToastEl.classList.remove("show","hide");
+    upToastEl.classList.add("go");
+    comboMilestoneImpact._goT = setTimeout(()=>{
+      upToastEl.classList.remove("go");
+      upToastEl.classList.add("show");
+    }, 10);
+    comboMilestoneImpact._hideT = setTimeout(()=>{
+      upToastEl.classList.remove("show");
+      upToastEl.classList.add("hide");
+    }, 1200);
+  }
+
+  function bumpCombo(){
+    comboCount++;
+    clearTimeout(comboTimer);
+    if(comboCount > state.bestCombo) state.bestCombo = comboCount;
+    if(comboCount >= 5){
+      comboEl.textContent = `${comboCount} COMBO ×${comboMult().toFixed(2)}`;
+      comboEl.classList.add("show");
+      comboEl.classList.remove("pop"); void comboEl.offsetWidth; comboEl.classList.add("pop");
+    }
+    if(comboCount % 100 === 0){
+      comboMilestoneImpact(comboCount);
+    }
+    comboTimer = setTimeout(()=>{
+      comboCount = 0;
+      comboEl.classList.remove("show");
+    }, 900);
+  }
+
+  function spawnFloat(x,y,amount,mode,wrapEl){
+    const wrap = wrapEl || touchWrapEl;
+    const f = document.createElement("div");
+    f.className = "float" + (mode==="crit"?" crit":"");
+    const prefix = mode==="crit" ? "CRIT +" : "+";
+    f.textContent = prefix + fmt(amount);
+    f.style.left = x + "px";
+    if(mode) f.style.top = "10%";
+    wrap.appendChild(f);
+    setTimeout(()=>f.remove(), 700);
+  }
+
+  function spawnSparks(x,y,wrapEl){
+    const wrap = wrapEl || touchWrapEl;
+    for(let i=0;i<6;i++){
+      const s = document.createElement("div");
+      s.className = "spark";
+      const angle = (Math.PI*2*i)/6 + Math.random()*0.3;
+      const dist = 34 + Math.random()*24;
+      s.style.setProperty("--dx", Math.cos(angle)*dist + "px");
+      s.style.setProperty("--dy", Math.sin(angle)*dist + "px");
+      s.style.left = x + "px";
+      s.style.top = y + "px";
+      wrap.appendChild(s);
+      setTimeout(()=>s.remove(), 600);
+    }
+  }
+
+  function updateMissionBadge(){
+    let n = 0;
+    MISSIONS.forEach(m=>{
+      const pr = m.id === "skinmaster" ? (state.missionTotalClaims||0) : state[m.track];
+      const cl = m.id === "skinmaster" ? !!state.missionSkinUnlocked : (m.weekly ? !!state.weeklyClaims[m.id] : !!state.dailyClaims[m.id]);
+      if(pr >= m.target && !cl) n++;
+    });
+    const tabEl = document.querySelector('.tab[data-tab="mission"]');
+    if(!tabEl) return;
+    tabEl.classList.toggle("alert", n > 0);
+    tabEl.innerHTML = n > 0 ? `미션<span class="tabBadge">${n}</span>` : "미션";
+  }
+
+  /* ---- monsters: click/auto score is also damage ---- */
+  const MONSTERS = [["슬라임","🟢"],["쥐","🐀"],["박쥐","🦇"],["늑대","🐺"],["멧돼지","🐗"],["좀비","🧟"],["고블린","👺"],["유령","👻"],["거미","🕷️"],["뱀","🐍"]];
+  const BOSSES = [["킹 슬라임","👑"],["오우거","👹"],["드래곤","🐉"],["리치","💀"],["악마","😈"],["외계 괴수","👾"]];
+  const BOSS_TIME_MS = 30000;
+  const monsterBoxEl = document.getElementById("monsterBox");
+  const monsterEmojiEl = document.getElementById("monsterEmoji");
+  const monsterNameEl = document.getElementById("monsterName");
+  const monsterHpFillEl = document.getElementById("monsterHpFill");
+  const monsterHpTextEl = document.getElementById("monsterHpText");
+  const huntBtnEl = document.getElementById("huntBtn");
+  let bossUntil = 0;
+  function isBoss(st){ return st % 10 === 0; }
+  function monsterMaxHp(st){ return Math.ceil(15 * Math.pow(1.2, st-1) * (isBoss(st) ? 8 : 1)); }
+  function monsterReward(st){ return Math.round(monsterMaxHp(st) * 0.5); }
+  function monsterInfo(st){
+    if(isBoss(st)){ const b = BOSSES[(st/10-1) % BOSSES.length]; return { name:b[0], emoji:b[1] }; }
+    const m = MONSTERS[(st-1) % MONSTERS.length];
+    return { name:m[0], emoji:m[1] };
+  }
+  function updateMonsterUI(){
+    monsterBoxEl.style.display = state.hunting ? "flex" : "none";
+    document.getElementById("normalStage").classList.toggle("huntMode", !!state.hunting);
+    huntBtnEl.classList.toggle("on", !!state.hunting);
+    huntBtnEl.textContent = state.hunting ? "⚔️ 도전 중" : "⚔️ 도전";
+    const st = state.stage, boss = isBoss(st), max = monsterMaxHp(st), m = monsterInfo(st);
+    monsterEmojiEl.textContent = m.emoji;
+    let name = `${boss ? "👑 BOSS · " : ""}STAGE ${st} · ${m.name}`;
+    if(boss) name += `  ⏱ ${Math.max(0, Math.ceil((bossUntil - Date.now())/1000))}초`;
+    monsterNameEl.textContent = name;
+    monsterBoxEl.classList.toggle("boss", boss);
+    monsterHpFillEl.style.width = Math.max(0, Math.min(100, (state.monsterHp / max) * 100)) + "%";
+    monsterHpTextEl.textContent = `${fmt(Math.max(0, state.monsterHp))} / ${fmt(max)}`;
+  }
+  function initMonster(){
+    if(!state.stage || state.stage < 1) state.stage = 1;
+    const max = monsterMaxHp(state.stage);
+    if(typeof state.monsterHp !== "number" || state.monsterHp <= 0 || state.monsterHp > max) state.monsterHp = max;
+    bossUntil = isBoss(state.stage) ? Date.now() + BOSS_TIME_MS : 0;
+    updateMonsterUI();
+  }
+  function monsterPop(text, fail){
+    const el = document.createElement("div");
+    el.className = "killPop" + (fail ? " fail" : "");
+    el.textContent = text;
+    monsterBoxEl.appendChild(el);
+    setTimeout(()=>el.remove(), 900);
+  }
+  function dealDamage(d){
+    if(!state.hunting || !(d > 0)) return;
+    state.monsterHp -= d;
+    let kills = 0, reward = 0, bossKilled = false;
+    while(state.monsterHp <= 0 && kills < 25){
+      const over = -state.monsterHp;
+      const st = state.stage;
+      reward += monsterReward(st);
+      if(isBoss(st)) bossKilled = true;
+      kills++;
+      state.kills = (state.kills||0) + 1;
+      state.stage = st + 1;
+      if(state.stage > (state.bestStage||1)) state.bestStage = state.stage;
+      state.monsterHp = Math.max(1, monsterMaxHp(state.stage) - over);
+    }
+    if(kills > 0){
+      state.score += reward;
+      state.total += reward;
+      bossUntil = isBoss(state.stage) ? Date.now() + BOSS_TIME_MS : 0;
+      monsterPop(kills > 1 ? `처치 ×${kills}  +${fmt(reward)}` : `+${fmt(reward)}`);
+      if(bossKilled && Date.now() > tempClickBuffUntil){
+        tempClickBuffMult = 2;
+        tempClickBuffUntil = Date.now() + 20000;
+      }
+      if(normalStageDisplayed()){
+        beep(bossKilled ? 523 : 660, .07, "square", .05);
+        setTimeout(()=>beep(bossKilled ? 784 : 880, .12, "square", .05), 70);
+      }
+    }
+    if(normalStageDisplayed()){
+      monsterEmojiEl.classList.remove("hit"); void monsterEmojiEl.offsetWidth; monsterEmojiEl.classList.add("hit");
+    }
+    updateMonsterUI();
+  }
+  function bossFail(){
+    state.stage = Math.max(1, state.stage - 1);
+    state.monsterHp = monsterMaxHp(state.stage);
+    bossUntil = 0;
+    monsterPop("보스 도주! 후퇴", true);
+    if(normalStageDisplayed()) beep(300, .2, "sawtooth", .05);
+    updateMonsterUI();
+  }
+  setInterval(()=>{
+    if(!state.hunting || !isBoss(state.stage)) return;
+    if(!normalStageDisplayed()){ bossUntil += 250; return; }
+    if(Date.now() >= bossUntil) bossFail(); else updateMonsterUI();
+  }, 250);
+
+  huntBtnEl.addEventListener("click", ()=>{
+    state.hunting = !state.hunting;
+    if(state.hunting) bossUntil = isBoss(state.stage) ? Date.now() + BOSS_TIME_MS : 0;
+    updateMonsterUI();
+    sizeTouchWrap();
+    save();
+  });
+
+  function dmgPop(text, crit){
+    const el = document.createElement("div");
+    el.className = "dmgPop" + (crit ? " crit" : "");
+    el.textContent = text;
+    el.style.left = (18 + Math.random()*55) + "%";
+    monsterBoxEl.appendChild(el);
+    setTimeout(()=>el.remove(), 700);
+  }
+  function autoAttack(){
+    const isCrit = Math.random() < (0.12 + titleBonus("critChance") + skinBonus("critChance") + critChanceUpg());
+    let amount = effClick();
+    if(isCrit) amount = Math.round(amount * critMultNormal());
+    state.score += amount;
+    state.total += amount;
+    state.dailyScore += amount;
+    state.weeklyScore += amount;
+    dmgPop((isCrit ? "CRIT " : "") + "-" + fmt(amount), isCrit);
+    dealDamage(amount);
+    updateUI();
+    scheduleHeavyRender();
+  }
+  setInterval(()=>{
+    if(state.hunting && normalStageDisplayed()) autoAttack();
+  }, 500);
+
+  let heavyTimer = null;
+  function scheduleHeavyRender(){
+    if(heavyTimer) return;
+    heavyTimer = setTimeout(()=>{
+      heavyTimer = null;
+      checkAch();
+      updateMissionBadge();
+      if(shopTab.style.display !== "none") renderShop();
+      if(prestigeTab.style.display !== "none") renderPrestige();
+      if(missionTab.style.display !== "none") renderMission();
+      if(statsTab.style.display !== "none") renderStats();
+      if(skinTab.style.display !== "none") renderSkins();
+      save();
+    }, 250);
+  }
+
+  function handleTouch(){
+    if(state.hunting) return;
+    if(state.vibrate && navigator.vibrate) navigator.vibrate(8);
+    bumpCombo();
+    const isCrit = Math.random() < (0.12 + titleBonus("critChance") + skinBonus("critChance") + critChanceUpg());
+    let amount = Math.round(effClick() * comboMult());
+    if(isCrit) amount = Math.round(amount * critMultNormal());
+    state.score += amount;
+    state.total += amount;
+    state.totalClicks += 1;
+    dealDamage(amount);
+    checkDailyReset();
+    state.dailyClicks += 1;
+    state.dailyScore += amount;
+    state.weeklyClicks += 1;
+    state.weeklyScore += amount;
+    if(isCrit){ state.dailyCrits += 1; state.weeklyCrits += 1; }
+    const rect = touchBtn.getBoundingClientRect();
+    const cx = rect.width/2, cy = rect.height/2;
+    const mode = isCrit ? "crit" : null;
+    spawnFloat(cx + (Math.random()*36-18), rect.height*0.22, amount, mode);
+    spawnSparks(cx, cy);
+    beep(isCrit?820:480, isCrit?0.12:0.05, isCrit?"square":"sine", isCrit?0.07:0.045);
+    updateUI();
+    scheduleHeavyRender();
+  }
+
+  touchBtn.addEventListener("click", handleTouch);
+
+  /* ---- hidden easter egg: the Konami code ---- */
+  const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+  let konamiProgress = 0;
+  function triggerEasterEgg(){
+    if(state.easterEggFound) return;
+    state.easterEggFound = true;
+    checkAch();
+    renderAch();
+    save();
+    if(fxOk()){ flashEl.classList.remove("go","gold"); void flashEl.offsetWidth;
+    flashEl.classList.add("gold","go"); }
+    if(typeof stageEl !== "undefined" && stageEl){
+      if(fxOk()){
+        stageEl.classList.remove("shake"); void stageEl.offsetWidth; stageEl.classList.add("shake");
+        setTimeout(()=>stageEl.classList.remove("shake"), 520);
+      }
+    }
+    beep(660,.15,"triangle",.07);
+    setTimeout(()=>beep(880,.15,"triangle",.07), 120);
+    setTimeout(()=>beep(1100,.25,"triangle",.08), 240);
+    upToastEl.textContent = "🎮 이스터에그 발견! 숨겨진 타이틀 해금!";
+    upToastEl.classList.remove("show","hide");
+    upToastEl.classList.add("go");
+    setTimeout(()=>{ upToastEl.classList.remove("go"); upToastEl.classList.add("show"); }, 10);
+    setTimeout(()=>{ upToastEl.classList.remove("show"); upToastEl.classList.add("hide"); }, 2200);
+  }
+  document.addEventListener("keydown", (e)=>{
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if(key === KONAMI[konamiProgress]){
+      konamiProgress++;
+      if(konamiProgress === KONAMI.length){
+        konamiProgress = 0;
+        triggerEasterEgg();
+      }
+    } else {
+      konamiProgress = (key === KONAMI[0]) ? 1 : 0;
+    }
+  });
+
+  /* ---- hidden easter egg: tap the menu title 7 times ---- */
+  const menuTitleEl = document.getElementById("menuTitle");
+  let titleTapCount = 0, titleTapTimer = null;
+  function triggerTitleEasterEgg(){
+    if(state.titleEggFound) return;
+    state.titleEggFound = true;
+    checkAch();
+    renderAch();
+    save();
+    beep(500,.1,"sine",.06);
+    setTimeout(()=>beep(650,.1,"sine",.06), 90);
+    setTimeout(()=>beep(800,.2,"sine",.07), 180);
+    menuTitleEl.textContent = "🫠 왜 자꾸 눌러요 저 그냥 글자인데";
+    setTimeout(()=>{ menuTitleEl.textContent = "터치 시뮬레이터"; }, 2400);
+  }
+  if(menuTitleEl){
+    menuTitleEl.addEventListener("click", ()=>{
+      titleTapCount++;
+      clearTimeout(titleTapTimer);
+      titleTapTimer = setTimeout(()=>{ titleTapCount = 0; }, 2000);
+      if(titleTapCount >= 7){
+        titleTapCount = 0;
+        triggerTitleEasterEgg();
+      }
+    });
+  }
+
+  document.addEventListener("keydown", (e)=>{
+    if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+    if(e.code === "Space" || e.key === " "){
+      if(typeof rogueActive!=="undefined" && rogueActive){
+        e.preventDefault();
+        if(e.repeat || roguePaused || Date.now() < rogueGraceUntil) return;
+        document.getElementById("rogueTouchBtn").classList.add("kbPress");
+        handleRogueTouch();
+        return;
+      }
+      if(normalStageDisplayed()){
+        e.preventDefault();
+        if(e.repeat) return;
+        touchBtn.classList.add("kbPress");
+        handleTouch();
+      }
+    }
+  });
+  document.addEventListener("keyup", (e)=>{
+    if(e.code === "Space" || e.key === " "){
+      touchBtn.classList.remove("kbPress");
+      const rb = document.getElementById("rogueTouchBtn");
+      if(rb) rb.classList.remove("kbPress");
+    }
+  });
+  function normalStageDisplayed(){
+    const el = document.getElementById("normalStage");
+    return el && el.style.display !== "none";
+  }
+
+  let autoTickId = null;
+  function startAutoTick(){
+    clearInterval(autoTickId);
+    autoTickId = setInterval(()=>{
+      if(state.autoPerSec > 0){
+        const a = effAuto();
+        state.score += a;
+        state.total += a;
+        state.dailyScore += a;
+        state.weeklyScore += a;
+        dealDamage(a);
+        scheduleHeavyRender();
+      }
+      updateUI();
+    }, autoTickMs());
+  }
+  startAutoTick();
+
+  setInterval(save, 5000);
+
+  const missionSubRowEl = document.getElementById("missionSubRow");
+  let missionSub = "daily";
+  const SUB_LABELS = { daily:"일일 미션", weekly:"주간 미션", skin:"스킨 미션" };
+  function switchTab(which){
+    document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===which));
+    shopTab.style.display = which==="shop" ? "flex":"none";
+    achTab.style.display = which==="ach" ? "flex":"none";
+    skinTab.style.display = which==="skin" ? "flex":"none";
+    prestigeTab.style.display = which==="prestige" ? "flex":"none";
+    statsTab.style.display = which==="stats" ? "flex":"none";
+    missionTab.style.display = which==="mission" ? "flex":"none";
+    qtyRowEl.style.display = which==="shop" ? "flex":"none";
+    missionSubRowEl.style.display = which==="mission" ? "flex":"none";
+    if(which==="shop") renderShop();
+    if(which==="ach") renderAch();
+    if(which==="skin") renderSkins();
+    if(which==="prestige") renderPrestige();
+    if(which==="stats") renderStats();
+    if(which==="mission") renderMission();
+  }
+  document.querySelectorAll(".tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>switchTab(tab.dataset.tab));
+  });
+  document.querySelectorAll(".subBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ missionSub = btn.dataset.sub; renderMission(); });
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", ()=>{
+    showConfirm("정말 초기화할까요? 모든 진행 상황이 사라집니다.", ()=>{
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    });
+  });
+
+  const muteBtn = document.getElementById("muteBtn");
+  muteBtn.addEventListener("click", ()=>{
+    soundMuted = !soundMuted;
+    muteBtn.textContent = soundMuted ? "🔇" : "🔊";
+    try{ localStorage.setItem("touch-sim-muted", soundMuted ? "1":"0"); }catch(e){}
+  });
+  try{
+    soundMuted = localStorage.getItem("touch-sim-muted") === "1";
+    muteBtn.textContent = soundMuted ? "🔇" : "🔊";
+  }catch(e){}
+
+  document.querySelectorAll(".qtyBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".qtyBtn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      buyQty = Number(btn.dataset.qty);
+      renderShop();
+    });
+  });
+
+
+  /* ---- Main menu / mode switching ---- */
+  const mainMenuEl = document.getElementById("mainMenu");
+  const normalStageEl = document.getElementById("normalStage");
+  const rogueStageEl = document.getElementById("rogueStage");
+
+  function updateMenuStats(){
+    const el = document.getElementById("menuStats");
+    if(el) el.textContent = `${state.nick ? state.nick + " · " : ""}LV ${levelFor(state.total).lv} · 환생 ${state.prestige} · 로그라이트 최고 ${fmt(state.rogueBest||0)}`;
+    updateRogueLock();
+  }
+
+  const ROGUE_UNLOCK_SCORE = 1000000;
+  function checkRogueUnlock(){
+    if(state.rogueUnlocked) return;
+    // earlier players who already used the mode (or hit the 1M title) keep access
+    if(state.total >= ROGUE_UNLOCK_SCORE || (state.unlockedAch && state.unlockedAch.a8) || (state.rogueRunsPlayed||0) > 0){
+      state.rogueUnlocked = true;
+      if(normalStageDisplayed()){
+        upToastEl.textContent = "🔓 로그라이트 모드 해금!";
+        upToastEl.classList.remove("show","hide");
+        upToastEl.classList.add("go");
+        setTimeout(()=>{ upToastEl.classList.remove("go"); upToastEl.classList.add("show"); }, 10);
+        setTimeout(()=>{ upToastEl.classList.remove("show"); upToastEl.classList.add("hide"); }, 2400);
+        beep(660,.1,"triangle",.07);
+        setTimeout(()=>beep(990,.18,"triangle",.08), 110);
+      }
+      save();
+    }
+  }
+  function updateRogueLock(){
+    checkRogueUnlock();
+    const btn = document.getElementById("startRogueBtn");
+    if(!btn) return;
+    const descEl = btn.querySelector(".menuBtnDesc");
+    if(descEl && !descEl.dataset.orig) descEl.dataset.orig = descEl.innerHTML;
+    btn.classList.toggle("locked", !state.rogueUnlocked);
+    if(descEl){
+      descEl.innerHTML = state.rogueUnlocked
+        ? descEl.dataset.orig
+        : `일반 모드에서 점수 ${fmt(ROGUE_UNLOCK_SCORE)} 달성 시 해금<br>현재 ${fmt(Math.min(state.total, ROGUE_UNLOCK_SCORE))} / ${fmt(ROGUE_UNLOCK_SCORE)}`;
+    }
+  }
+
+  /* ---- nickname + shared leaderboard (needs the page's db capability) ---- */
+  const lbOverlayEl = document.getElementById("lbOverlay");
+  const lbListEl = document.getElementById("lbList");
+  const lbNickEl = document.getElementById("lbNick");
+  const lbMsgEl = document.getElementById("lbMsg");
+  const lbMineEl = document.getElementById("lbMine");
+  const lbStatusEl = document.getElementById("lbStatus");
+  let lbTab = "bestStage";
+  const LB_FMT = {
+    bestStage:v=>`스테이지 ${v}`,
+    rogueBest:v=>`${fmt(v)}점`,
+    prestige:v=>`${v}회`,
+  };
+  function cleanNick(v){ return String(v||"").replace(/\s+/g," ").trim().slice(0,10); }
+  function boardPayload(){
+    return { nick:state.nick, bestStage:state.bestStage||1, rogueBest:state.rogueBest||0, prestige:state.prestige||0, kills:state.kills||0 };
+  }
+  function boardCanSync(){
+    if(!state.nick) return false;
+    return useRest() ? true : !!(lbDb && lbUid && lbCanWrite);
+  }
+  function scheduleBoardSync(){
+    if(!boardCanSync() || lbTimer) return;
+    lbTimer = setTimeout(()=>{ lbTimer = null; syncBoard(); }, 8000);
+  }
+  function boardBase(){ return BOARD_URL.replace(/\/+$/, ""); }
+  function ensurePid(){
+    if(!state.pid){
+      const a = new Uint8Array(10);
+      if(window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(a);
+      else for(let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256);
+      state.pid = "p" + Array.from(a, b=>b.toString(16).padStart(2, "0")).join("");
+      save();
+    }
+    return state.pid;
+  }
+  function myBoardId(){ return useRest() ? state.pid : lbUid; }
+  async function fetchBoardRest(){
+    try{
+      const q = encodeURIComponent('"' + lbTab + '"');
+      const res = await fetch(boardBase() + "/board.json?orderBy=" + q + "&limitToLast=50");
+      if(!res.ok) throw new Error("http " + res.status);
+      const data = await res.json();
+      lbRows = Object.keys(data || {}).map(k=>Object.assign({ id:k }, data[k]));
+      lbError = "";
+    }catch(e){ lbError = "network"; }
+    renderBoard();
+  }
+  setInterval(()=>{ if(useRest() && lbOverlayEl.classList.contains("show")) fetchBoardRest(); }, 15000);
+  async function syncBoard(){
+    if(!boardCanSync() || lbBusy) return;
+    const payload = boardPayload();
+    const key = JSON.stringify(payload);
+    if(key === lbLastSynced) return;
+    lbBusy = true;
+    try{
+      if(useRest()){
+        const res = await fetch(boardBase() + "/board/" + ensurePid() + ".json", { method:"PUT", headers:{ "Content-Type":"application/json" }, body:key });
+        if(!res.ok) throw new Error("http " + res.status);
+      }else{
+        await lbDb.doc("board/" + lbUid).set(payload);
+      }
+      lbLastSynced = key;
+      lbError = "";
+    }catch(e){
+      lbError = useRest() ? "network" : ((e && e.code) || "unavailable");
+      if(!useRest() && lbError === "invalid_argument") lbCanWrite = false;
+    }
+    lbBusy = false;
+    if(useRest() && lbOverlayEl.classList.contains("show")) fetchBoardRest(); else renderBoard();
+  }
+  function renderBoard(){
+    if(!lbOverlayEl.classList.contains("show")) return;
+    document.querySelectorAll("[data-lb]").forEach(b=>b.classList.toggle("active", b.dataset.lb === lbTab));
+    lbMineEl.textContent = `내 기록 · ${state.nick || "닉네임 없음"} · 스테이지 ${state.bestStage||1} · 로그라이트 ${fmt(state.rogueBest||0)} · 환생 ${state.prestige||0}회`;
+    lbListEl.innerHTML = "";
+    if(!useRest() && !lbDb){
+      lbStatusEl.textContent = "상태: 연결 안 됨\n순위표는 claude.ai 앱이나 뷰어 안에서, 로그인한 상태로 열었을 때만 연결돼요. 링크를 새 창으로 바로 열었거나 내려받은 파일이면 연결되지 않아요. 지금은 닉네임만 이 기기에 저장돼요.";
+      return;
+    }
+    const rows = lbRows.slice().sort((a,b)=>
+      (b[lbTab]||0) - (a[lbTab]||0) || (b.bestStage||0) - (a.bestStage||0) || String(a.nick||"").localeCompare(String(b.nick||""))
+    ).slice(0, 50);
+    if(rows.length === 0){
+      const e = document.createElement("div");
+      e.className = "lbStatus";
+      e.textContent = "아직 등록된 기록이 없어요. 닉네임을 저장하면 첫 기록이 올라가요.";
+      lbListEl.appendChild(e);
+    }
+    rows.forEach((r,i)=>{
+      const row = document.createElement("div");
+      row.className = "lbRow" + (r.id === myBoardId() ? " me" : "");
+      const rk = document.createElement("div"); rk.className = "lbRank"; rk.textContent = i < 3 ? ["🥇","🥈","🥉"][i] : String(i+1);
+      const nm = document.createElement("div"); nm.className = "lbName"; nm.textContent = r.nick || "이름 없음";
+      const vl = document.createElement("div"); vl.className = "lbVal"; vl.textContent = LB_FMT[lbTab](r[lbTab]||0);
+      row.append(rk, nm, vl);
+      lbListEl.appendChild(row);
+    });
+    let status = "", diag = "";
+    if(useRest()){
+      diag = "상태: 온라인 서버 · 상위 " + lbRows.length + "명 표시" + (lbError ? " · 오류 " + lbError : "");
+      status = !state.nick ? "닉네임을 저장하면 내 기록이 순위표에 올라가요."
+        : (lbError ? "서버에 연결하지 못했어요. 잠시 후 다시 시도돼요." : "기록은 바뀐 뒤 8초 안에 자동으로 올라가요.");
+    }else{
+      if(!lbUid) status = "로그인 정보를 확인하지 못했어요. 순위표는 볼 수만 있어요.";
+      else if(!lbCanWrite) status = "이 계정은 보기 전용이라 내 기록을 올릴 수 없어요.";
+      else if(!state.nick) status = "닉네임을 저장하면 내 기록이 순위표에 올라가요.";
+      else if(lbError) status = "기록 등록이 잠시 실패했어요. 잠시 후 다시 시도돼요.";
+      else status = "기록은 8초에 한 번 자동으로 갱신돼요.";
+      diag = "상태: 연결됨 · 등록된 플레이어 " + lbRows.length + "명 · " + (lbUid ? (lbCanWrite ? "내 기록 올리기 가능" : "보기 전용") : "로그인 확인 불가") + (lbError ? " · 오류 " + lbError : "");
+    }
+    lbStatusEl.textContent = diag + "\n" + status;
+  }
+  function openBoard(){
+    lbNickEl.value = state.nick || "";
+    lbMsgEl.textContent = "";
+    lbOverlayEl.classList.add("show");
+    renderBoard();
+    if(useRest()) fetchBoardRest();
+  }
+  document.getElementById("openBoardBtn").addEventListener("click", openBoard);
+  document.getElementById("menuOpenBoard").addEventListener("click", openBoard);
+  document.getElementById("lbClose").addEventListener("click", ()=>lbOverlayEl.classList.remove("show"));
+  lbOverlayEl.addEventListener("click", (e)=>{ if(e.target === lbOverlayEl) lbOverlayEl.classList.remove("show"); });
+  document.querySelectorAll("[data-lb]").forEach(b=>b.addEventListener("click", ()=>{ lbTab = b.dataset.lb; renderBoard(); if(useRest()) fetchBoardRest(); }));
+  document.getElementById("lbSave").addEventListener("click", ()=>{
+    const n = cleanNick(lbNickEl.value);
+    if(n.length < 2){ lbMsgEl.textContent = "닉네임은 2자 이상 입력해 주세요."; return; }
+    state.nick = n;
+    lbNickEl.value = n;
+    save();
+    updateMenuStats();
+    lbMsgEl.textContent = "닉네임이 저장됐어요.";
+    lbLastSynced = "";
+    syncBoard();
+    renderBoard();
+  });
+  /* ---- auto-update for downloaded copies ----
+     A saved file can't change itself, so on launch it asks UPDATE_URL for the newest file.
+     If that file has a different GAME_VERSION it is shown in place of this one (saves are untouched).
+     Inactive while UPDATE_URL is empty, inside claude.ai (always the latest there), or when offline. */
+  const GAME_VERSION = "6";
+  const UPDATE_URL = "";
+  async function checkForUpdate(){
+    try{
+      if(!UPDATE_URL || window.claude || window.top !== window.self || !navigator.onLine) return;
+      const res = await fetch(UPDATE_URL + (UPDATE_URL.indexOf("?") >= 0 ? "&" : "?") + "t=" + Date.now(), { cache:"no-store" });
+      if(!res.ok) return;
+      const html = await res.text();
+      const m = html.match(/const GAME_VERSION = "([^"]+)"/);
+      if(!m || m[1] === GAME_VERSION) return;
+      window.__updating = true;
+      for(let i = setTimeout(()=>{}, 0); i > 0; i--){ clearInterval(i); clearTimeout(i); }
+      document.body.innerHTML = "";
+      document.body.style.cssText = "margin:0;padding:0;overflow:hidden;display:block;";
+      const f = document.createElement("iframe");
+      f.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;";
+      f.srcdoc = html;
+      document.body.appendChild(f);
+    }catch(e){ /* offline or blocked: keep playing the local copy */ }
+  }
+
+  /* ---- first-run: nickname + tutorial ---- */
+  const introOverlayEl = document.getElementById("introOverlay");
+  const TUT_PAGES = [
+    { icon:"👆", title:"터치로 점수 모으기", text:"가운데 TOUCH 버튼을 누르면 점수가 올라요.<br>연속으로 누르면 콤보 배수가 붙고, 가끔 크리티컬이 터져요." },
+    { icon:"🛒", title:"상점에서 강해지기", text:"모은 점수로 클릭 파워, 자동 생산, 크리티컬 같은<br>업그레이드를 사요. 초록 테두리는 지금 살 수 있는 거예요." },
+    { icon:"⚔️", title:"도전으로 몬스터 사냥", text:"위쪽 ⚔️ 도전을 누르면 자동으로 몬스터를 사냥해요.<br>10스테이지마다 나오는 보스는 30초 안에 잡아야 해요." },
+    { icon:"🎯", title:"미션과 타이틀", text:"미션 탭에서 일일·주간 보상을 받아요. 타이틀과 스킨을<br>장착하면 능력치가 올라가요. 빨간 숫자는 받을 보상이에요." },
+    { icon:"🔁", title:"환생과 로그라이트", text:"레벨 10이 되면 환생해서 영구 배율을 얻어요.<br>점수 1M을 모으면 로그라이트 모드가 열려요." },
+  ];
+  let tutIdx = 0;
+  function renderTutorial(){
+    const pg = TUT_PAGES[tutIdx];
+    document.getElementById("tutBody").innerHTML = `<div class="tutIcon">${pg.icon}</div><div class="tutTitle">${pg.title}</div><div class="tutText">${pg.text}</div>`;
+    document.getElementById("tutDots").innerHTML = TUT_PAGES.map((_,i)=>`<span class="tutDot${i===tutIdx?" on":""}"></span>`).join("");
+    document.getElementById("tutPrev").style.visibility = tutIdx === 0 ? "hidden" : "visible";
+    document.getElementById("tutNext").textContent = tutIdx === TUT_PAGES.length - 1 ? "시작하기" : "다음";
+  }
+  function showTutorialView(){
+    document.getElementById("introNickView").style.display = "none";
+    document.getElementById("introTutView").style.display = "flex";
+    tutIdx = 0;
+    renderTutorial();
+  }
+  function finishIntro(){
+    state.tutorialDone = true;
+    save();
+    introOverlayEl.classList.remove("show");
+  }
+  function maybeShowIntro(){
+    if(state.tutorialDone) return;
+    introOverlayEl.classList.add("show");
+    if(state.nick){ showTutorialView(); return; }
+    document.getElementById("introNickView").style.display = "flex";
+    document.getElementById("introTutView").style.display = "none";
+    document.getElementById("introMsg").textContent = "";
+  }
+  document.getElementById("introNickOk").addEventListener("click", ()=>{
+    const n = cleanNick(document.getElementById("introNick").value);
+    if(n.length < 2){ document.getElementById("introMsg").textContent = "닉네임은 2자 이상 입력해 주세요."; return; }
+    state.nick = n;
+    save();
+    updateMenuStats();
+    lbLastSynced = "";
+    syncBoard();
+    showTutorialView();
+  });
+  document.getElementById("introNickSkip").addEventListener("click", showTutorialView);
+  document.getElementById("tutPrev").addEventListener("click", ()=>{ if(tutIdx > 0){ tutIdx--; renderTutorial(); } });
+  document.getElementById("tutNext").addEventListener("click", ()=>{
+    if(tutIdx < TUT_PAGES.length - 1){ tutIdx++; renderTutorial(); } else finishIntro();
+  });
+  document.getElementById("tutSkip").addEventListener("click", finishIntro);
+
+  async function initLeaderboard(){
+    try{
+      if(useRest()){ scheduleBoardSync(); return; }
+      if(!window.claude || !window.claude.use) return;
+      const db = await window.claude.use("db");
+      if(!db) return;
+      const user = await window.claude.use("user");
+      lbDb = db;
+      if(user){
+        lbUid = await user.id();
+        const can = await user.can("data.write");
+        lbCanWrite = !!lbUid && can !== false;
+      }
+      db.collection("board").limit(300).onSnapshot(
+        (snap)=>{ lbRows = snap.docs.map(d=>Object.assign({ id:d.id }, d.data())); renderBoard(); },
+        (err)=>{ lbError = (err && err.code) || "unavailable"; renderBoard(); }
+      );
+      scheduleBoardSync();
+    }catch(e){ lbDb = null; }
+  }
+  function showMainMenu(){
+    playLoadingScreen(()=>{
+      updateMenuStats();
+      mainMenuEl.style.display = "flex";
+      normalStageEl.style.display = "none";
+      rogueStageEl.style.display = "none";
+    });
+  }
+  function showNormalStage(){
+    playLoadingScreen(()=>{
+      mainMenuEl.style.display = "none";
+      normalStageEl.style.display = "flex";
+      rogueStageEl.style.display = "none";
+      setTimeout(sizeTouchWrap, 30);
+      setTimeout(maybeShowIntro, 150);
+    });
+  }
+  function showRogueStage(){
+    playLoadingScreen(()=>{
+      mainMenuEl.style.display = "none";
+      normalStageEl.style.display = "none";
+      rogueStageEl.style.display = "flex";
+      sizeRogueTouchWrap();
+      setTimeout(sizeRogueTouchWrap, 50);
+      startRogueRun();
+    });
+  }
+  document.getElementById("startNormalBtn").addEventListener("click", showNormalStage);
+  document.getElementById("startRogueBtn").addEventListener("click", ()=>{
+    if(!state.rogueUnlocked){ updateRogueLock(); return; }
+    openDiffOverlay();
+  });
+  /* ---- menu + settings ---- */
+  const menuOverlayEl = document.getElementById("menuOverlay");
+  const menuViewEl = document.getElementById("menuView");
+  const settingsViewEl = document.getElementById("settingsView");
+  const setReduceFxEl = document.getElementById("setReduceFx");
+  const setVibrateEl = document.getElementById("setVibrate");
+  let menuPausedRogue = false;
+
+  function applySettings(){
+    document.body.classList.toggle("reduceFx", !!state.reduceEffects);
+    setReduceFxEl.textContent = state.reduceEffects ? "ON" : "OFF";
+    setReduceFxEl.classList.toggle("on", !!state.reduceEffects);
+    setVibrateEl.textContent = state.vibrate ? "ON" : "OFF";
+    setVibrateEl.classList.toggle("on", !!state.vibrate);
+  }
+  function openMenu(){
+    if(rogueActive && !roguePaused){
+      clearInterval(rogueTimerId);
+      roguePaused = true;
+      menuPausedRogue = true;
+    }
+    menuViewEl.style.display = "flex";
+    settingsViewEl.style.display = "none";
+    menuOverlayEl.classList.add("show");
+  }
+  function closeMenu(){
+    menuOverlayEl.classList.remove("show");
+    if(menuPausedRogue){
+      menuPausedRogue = false;
+      roguePaused = false;
+      if(rogueActive) startRogueTimerLoop();
+    }
+  }
+  document.getElementById("backBtn1").addEventListener("click", openMenu);
+  document.getElementById("backBtn2").addEventListener("click", openMenu);
+  document.getElementById("menuClose").addEventListener("click", closeMenu);
+  menuOverlayEl.addEventListener("click", (e)=>{ if(e.target === menuOverlayEl) closeMenu(); });
+  document.getElementById("menuGoMain").addEventListener("click", ()=>{
+    menuOverlayEl.classList.remove("show");
+    menuPausedRogue = false;
+    if(rogueTimerId) clearInterval(rogueTimerId);
+    rogueActive = false;
+    roguePaused = false;
+    showMainMenu();
+  });
+  document.getElementById("menuOpenSettings").addEventListener("click", ()=>{
+    settingsFromMain = false;
+    menuViewEl.style.display = "none";
+    settingsViewEl.style.display = "flex";
+  });
+  let settingsFromMain = false;
+  document.getElementById("openSettingsBtn").addEventListener("click", ()=>{
+    settingsFromMain = true;
+    menuViewEl.style.display = "none";
+    settingsViewEl.style.display = "flex";
+    menuOverlayEl.classList.add("show");
+  });
+  document.getElementById("setBack").addEventListener("click", ()=>{
+    if(settingsFromMain){ settingsFromMain = false; closeMenu(); return; }
+    settingsViewEl.style.display = "none";
+    menuViewEl.style.display = "flex";
+  });
+  setReduceFxEl.addEventListener("click", ()=>{ state.reduceEffects = !state.reduceEffects; applySettings(); save(); });
+  setVibrateEl.addEventListener("click", ()=>{
+    state.vibrate = !state.vibrate;
+    applySettings(); save();
+    if(state.vibrate && navigator.vibrate) navigator.vibrate(30);
+  });
+
+  /* ---- Roguelite mode ---- */
+  const rogueTouchBtn = document.getElementById("rogueTouchBtn");
+  const rogueTouchWrapEl = document.getElementById("rogueTouchWrap");
+  const rogueScoreEl = document.getElementById("rogueScoreEl");
+  const rogueRateEl = document.getElementById("rogueRateEl");
+  const rogueTimerEl = document.getElementById("rogueTimerEl");
+  const rogueCoreEl = document.getElementById("rogueCoreEl");
+  const buffOverlayEl = document.getElementById("buffOverlay");
+  const buffTitleEl = document.getElementById("buffTitle");
+  const buffCardsWrapEl = document.getElementById("buffCardsWrap");
+  const runEndBoxEl = document.getElementById("runEndBox");
+  const runEndTextEl = document.getElementById("runEndText");
+
+  function sizeRogueTouchWrap(){
+    const ca = rogueStageEl.querySelector(".centerArea");
+    if(!ca || !ca.clientHeight) return;
+    const availH = ca.clientHeight - rogueScoreEl.offsetHeight - rogueRateEl.offsetHeight - 50;
+    const availW = ca.clientWidth - 20;
+    const size = Math.max(70, Math.min(availH, availW, 180));
+    rogueTouchWrapEl.style.width = size + "px";
+    rogueTouchWrapEl.style.height = size + "px";
+  }
+  window.addEventListener("resize", sizeRogueTouchWrap);
+
+  const ROGUE_DURATION = 60;
+  const DIFFICULTIES = {
+    normal:{ id:"normal", name:"보통", duration:60, interval:10, reward:1, desc:"60초 · 버프 10초마다 · 보상 ×1" },
+    hard:{ id:"hard", name:"어려움", duration:45, interval:10, reward:1.5, desc:"45초 · 버프 10초마다 · 보상 ×1.5" },
+    hell:{ id:"hell", name:"지옥", duration:30, interval:8, reward:2.5, desc:"30초 · 버프 8초마다 · 보상 ×2.5" },
+  };
+  let rogueDiff = DIFFICULTIES.normal;
+  const diffOverlayEl = document.getElementById("diffOverlay");
+  const diffCardsEl = document.getElementById("diffCards");
+  function openDiffOverlay(){
+    diffCardsEl.innerHTML = "";
+    Object.values(DIFFICULTIES).forEach(d=>{
+      const best = (state.rogueBestDiff && state.rogueBestDiff[d.id]) || 0;
+      const btn = document.createElement("button");
+      btn.className = "menuItemBtn diffCard " + d.id;
+      btn.innerHTML = `<div class="dName">${d.name}</div><div class="dDesc">${d.desc}</div><div class="dBest">최고 기록 ${fmt(best)}</div>`;
+      btn.addEventListener("click", ()=>{
+        rogueDiff = d;
+        diffOverlayEl.classList.remove("show");
+        showRogueStage();
+      });
+      diffCardsEl.appendChild(btn);
+    });
+    diffOverlayEl.classList.add("show");
+  }
+  document.getElementById("diffCancel").addEventListener("click", ()=>diffOverlayEl.classList.remove("show"));
+  diffOverlayEl.addEventListener("click", (e)=>{ if(e.target === diffOverlayEl) diffOverlayEl.classList.remove("show"); });
+  const RARITY_LABEL = { rare:"희귀", epic:"에픽", legendary:"전설", mythic:"신화" };
+  const RARITY_WEIGHT = { rare:60, epic:30, legendary:10, mythic:3 };
+  const BUFF_POOL = [
+    { name:"강한 손", desc:"클릭파워 +3", rarity:"rare", apply:()=>{ rogueClickPower += 3; } },
+    { name:"파워 부스트", desc:"클릭파워 ×1.5", rarity:"epic", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*1.5); } },
+    { name:"집중", desc:"클릭파워 +4", rarity:"rare", apply:()=>{ rogueClickPower += 4; } },
+    { name:"숙련자의 손", desc:"클릭파워 +8", rarity:"epic", apply:()=>{ rogueClickPower += 8; } },
+    { name:"행운의 손가락", desc:"크리티컬 확률 +10%p", rarity:"rare", apply:()=>{ rogueCritBonus += 0.10; } },
+    { name:"이중 손놀림", desc:"클릭 시 30% 확률로 두 번 타격", rarity:"legendary", apply:()=>{ rogueDoubleChance += 0.3; } },
+    { name:"연쇄 반응", desc:"두 번 타격 확률 +20%p", rarity:"epic", apply:()=>{ rogueDoubleChance += 0.2; } },
+    { name:"필살의 일격", desc:"크리티컬 데미지 배율 +3배", rarity:"legendary", apply:()=>{ rogueCritMult += 3; } },
+    { name:"강철 멘탈", desc:"크리티컬 확률 +25%p, 대신 클릭파워 -1", rarity:"epic", apply:()=>{ rogueCritBonus += 0.25; rogueClickPower = Math.max(1, rogueClickPower-1); } },
+    { name:"시간 조작", desc:"남은 시간 +6초", rarity:"rare", apply:()=>{ rogueTimeLeft += 6; } },
+    { name:"회복의 손길", desc:"남은 시간 +15초, 대신 클릭파워 -2", rarity:"epic", apply:()=>{ rogueTimeLeft += 15; rogueClickPower = Math.max(1, rogueClickPower-2); } },
+    { name:"메아리의 축복", desc:"남은 시간 동안 초당 +3점 자동 획득", rarity:"rare", apply:()=>{ rogueAutoPerSec += 3; } },
+    { name:"폭풍의 축복", desc:"남은 시간 동안 초당 +6점 자동 획득", rarity:"epic", apply:()=>{ rogueAutoPerSec += 6; } },
+    { name:"만능 재주꾼", desc:"클릭파워 +1, 크리티컬 +5%p, 초당 +1", rarity:"rare", apply:()=>{ rogueClickPower += 1; rogueCritBonus += 0.05; rogueAutoPerSec += 1; } },
+    { name:"광폭화", desc:"클릭파워 ×2, 대신 크리티컬 확률 -10%p", rarity:"epic", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*2); rogueCritBonus = Math.max(0, rogueCritBonus-0.10); } },
+    { name:"폭주 모드", desc:"클릭파워 ×3, 대신 남은 시간 -10초", rarity:"legendary", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*3); rogueTimeLeft = Math.max(1, rogueTimeLeft-10); } },
+    { name:"도박꾼의 감", desc:"50% 확률로 클릭파워 ×4, 50% 확률로 ×1.2", rarity:"legendary", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*(Math.random()<0.5?4:1.2)); } },
+    { name:"궁극의 각성", desc:"클릭파워 ×5", rarity:"mythic", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*5); } },
+    { name:"시간 정지", desc:"남은 시간 +30초", rarity:"mythic", apply:()=>{ rogueTimeLeft += 30; } },
+    { name:"완전한 파괴", desc:"크리티컬 확률 +50%p, 크리티컬 배율 +5", rarity:"mythic", apply:()=>{ rogueCritBonus += 0.5; rogueCritMult += 5; } },
+  ];
+
+  const STARTING_PERKS = [
+    { name:"빠른 손", desc:"시작 클릭파워 +3", apply:()=>{ rogueClickPower += 3; } },
+    { name:"여유로운 준비", desc:"시작 시간 +10초", apply:()=>{ rogueTimeLeft += 10; } },
+    { name:"예열된 엔진", desc:"시작 자동생산 +2/초", apply:()=>{ rogueAutoPerSec += 2; } },
+    { name:"행운의 시작", desc:"시작 크리티컬 확률 +10%p", apply:()=>{ rogueCritBonus += 0.10; } },
+    { name:"균형 잡힌 시작", desc:"클릭파워 +1, 크리티컬 +5%p, 시간 +5초", apply:()=>{ rogueClickPower += 1; rogueCritBonus += 0.05; rogueTimeLeft += 5; } },
+  ];
+
+  let roguePaused = false, buffUnlockTimer = null, rogueGraceUntil = 0;
+  let rogueActive = false, rogueScore = 0, rogueClickPower = 1, rogueCritBonus = 0, rogueAutoPerSec = 0, rogueDoubleChance = 0, rogueCritMult = 5;
+  let rogueTimeLeft = ROGUE_DURATION, rogueTimerId = null;
+  let rogueElapsed = 0;
+
+  function updateRogueUI(){
+    rogueScoreEl.textContent = fmt(rogueScore);
+    rogueRateEl.textContent = `클릭파워 ${rogueClickPower}`
+      + (rogueCritBonus>0 ? ` · 크리티컬 +${Math.round(rogueCritBonus*100)}%p` : "")
+      + (rogueAutoPerSec>0 ? ` · 초당 +${rogueAutoPerSec}` : "")
+      + (rogueDoubleChance>0 ? ` · 더블 ${Math.round(rogueDoubleChance*100)}%` : "")
+      + (rogueCritMult>5 ? ` · 크리티컬 배율 x${rogueCritMult}` : "");
+    rogueTimerEl.textContent = rogueTimeLeft;
+    rogueCoreEl.textContent = fmt(Math.max((state.rogueBestDiff && state.rogueBestDiff[rogueDiff.id]) || 0, rogueScore));
+  }
+
+  const SYNERGIES = [
+    { id:"crit", name:"치명의 연계", pair:["행운의 손가락","필살의 일격"], desc:"크리티컬 확률 +10%p, 배율 +1", apply:()=>{ rogueCritBonus += 0.10; rogueCritMult += 1; } },
+    { id:"twin", name:"쌍둥이 폭풍", pair:["이중 손놀림","연쇄 반응"], desc:"두 번 타격 확률 +15%p", apply:()=>{ rogueDoubleChance += 0.15; } },
+    { id:"time", name:"시간의 지배자", pair:["시간 조작","회복의 손길"], desc:"남은 시간 +8초, 클릭파워 +3", apply:()=>{ rogueTimeLeft += 8; rogueClickPower += 3; } },
+    { id:"echo", name:"폭풍의 합창", pair:["메아리의 축복","폭풍의 축복"], desc:"초당 +5점 추가", apply:()=>{ rogueAutoPerSec += 5; } },
+    { id:"rage", name:"광전사의 각성", pair:["광폭화","폭주 모드"], desc:"크리티컬 확률 +20%p", apply:()=>{ rogueCritBonus += 0.20; } },
+    { id:"balance", name:"완벽한 균형", pair:["만능 재주꾼","균형 잡힌 시작"], desc:"클릭파워 +3, 크리티컬 +5%p, 초당 +2", apply:()=>{ rogueClickPower += 3; rogueCritBonus += 0.05; rogueAutoPerSec += 2; } },
+    { id:"power", name:"강화의 정수", pair:["숙련자의 손","파워 부스트"], desc:"클릭파워 ×1.3", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*1.3); } },
+    { id:"gamble", name:"배수의 진", pair:["도박꾼의 감","강철 멘탈"], desc:"크리티컬 배율 +2", apply:()=>{ rogueCritMult += 2; } },
+    { id:"myth", name:"신화의 공명", pair:["궁극의 각성","완전한 파괴"], desc:"클릭파워 ×1.5, 크리티컬 확률 +10%p", apply:()=>{ rogueClickPower = Math.round(rogueClickPower*1.5); rogueCritBonus += 0.10; } },
+    { id:"forever", name:"영원한 폭풍", pair:["시간 정지","폭풍의 축복"], desc:"초당 +8점 추가", apply:()=>{ rogueAutoPerSec += 8; } },
+  ];
+  let rogueTaken = new Set(), rogueSynergyDone = new Set();
+  const synergyToastEl = document.getElementById("synergyToast");
+  let synergyToastTimer = null;
+  function synergyFor(name){
+    return SYNERGIES.find(sy=>!rogueSynergyDone.has(sy.id) && sy.pair.includes(name) && sy.pair.every(n=>n===name||rogueTaken.has(n)));
+  }
+  function showSynergyToast(sy){
+    synergyToastEl.textContent = `✨ 시너지! ${sy.name} — ${sy.desc}`;
+    synergyToastEl.classList.add("show");
+    clearTimeout(synergyToastTimer);
+    synergyToastTimer = setTimeout(()=>synergyToastEl.classList.remove("show"), 2800);
+    beep(880,.12,"triangle",.07);
+    setTimeout(()=>beep(1175,.2,"triangle",.08), 120);
+  }
+  function takeBuff(name){
+    rogueTaken.add(name);
+    SYNERGIES.forEach(sy=>{
+      if(rogueSynergyDone.has(sy.id)) return;
+      if(sy.pair.every(n=>rogueTaken.has(n))){
+        rogueSynergyDone.add(sy.id);
+        sy.apply();
+        showSynergyToast(sy);
+      }
+    });
+  }
+
+  function pickBuffs(n){
+    const pool = BUFF_POOL.slice();
+    const picks = [];
+    for(let k=0;k<n && pool.length;k++){
+      const total = pool.reduce((s,b)=>s+RARITY_WEIGHT[b.rarity], 0);
+      let r = Math.random()*total;
+      let idx = 0;
+      for(;idx<pool.length;idx++){
+        r -= RARITY_WEIGHT[pool[idx].rarity];
+        if(r<=0) break;
+      }
+      if(idx>=pool.length) idx = pool.length-1;
+      picks.push(pool[idx]);
+      pool.splice(idx,1);
+    }
+    return picks;
+  }
+
+  function showStartingPerkChoice(){
+    roguePaused = true;
+    if(document.activeElement) document.activeElement.blur();
+    buffTitleEl.textContent = "✦ 시작 버프를 선택하세요";
+    const pool = STARTING_PERKS.slice();
+    for(let i=pool.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [pool[i],pool[j]] = [pool[j],pool[i]];
+    }
+    const opts = pool.slice(0,3);
+    buffCardsWrapEl.innerHTML = "";
+    opts.forEach(opt=>{
+      const card = document.createElement("div");
+      card.className = "buffCard locked";
+      card.innerHTML = `<div class="bName">${opt.name}</div><div class="bDesc">${opt.desc}</div>`;
+      card.addEventListener("click", ()=>{
+        if(card.classList.contains("locked")) return;
+        opt.apply();
+        takeBuff(opt.name);
+        rogueGraceUntil = Date.now() + 400;
+        buffOverlayEl.classList.remove("show");
+        buffTitleEl.textContent = "✦ 능력을 선택하세요";
+        updateRogueUI();
+        beep(700,.15,"triangle",.06);
+        rogueActive = true;
+        roguePaused = false;
+        startRogueTimerLoop();
+      });
+      buffCardsWrapEl.appendChild(card);
+    });
+    buffOverlayEl.classList.add("show");
+    clearTimeout(buffUnlockTimer);
+    buffUnlockTimer = setTimeout(()=>{
+      buffCardsWrapEl.querySelectorAll(".buffCard").forEach(c=>c.classList.remove("locked"));
+    }, 1000);
+  }
+
+  function showBuffChoice(){
+    clearInterval(rogueTimerId);
+    roguePaused = true;
+    if(document.activeElement) document.activeElement.blur();
+    const opts = pickBuffs(3);
+    buffCardsWrapEl.innerHTML = "";
+    opts.forEach(opt=>{
+      const card = document.createElement("div");
+      const syn = synergyFor(opt.name);
+      card.className = "buffCard locked " + opt.rarity + (syn ? " synergy" : "");
+      card.innerHTML = `<div><span class="bRarity ${opt.rarity}">${RARITY_LABEL[opt.rarity]}</span>${syn ? `<span class="bSynergy">✨ ${syn.name}</span>` : ""}</div><div class="bName">${opt.name}</div><div class="bDesc">${opt.desc}</div>`;
+      card.addEventListener("click", ()=>{
+        if(card.classList.contains("locked")) return;
+        opt.apply();
+        takeBuff(opt.name);
+        rogueGraceUntil = Date.now() + 400;
+        if(opt.rarity === "mythic"){
+          state.rogueMythicCount = (state.rogueMythicCount||0) + 1;
+          checkAch();
+          renderAch();
+          save();
+        }
+        buffOverlayEl.classList.remove("show");
+        roguePaused = false;
+        updateRogueUI();
+        beep(700,.15,"triangle",.06);
+        startRogueTimerLoop();
+      });
+      buffCardsWrapEl.appendChild(card);
+    });
+    buffOverlayEl.classList.add("show");
+    clearTimeout(buffUnlockTimer);
+    buffUnlockTimer = setTimeout(()=>{
+      buffCardsWrapEl.querySelectorAll(".buffCard").forEach(c=>c.classList.remove("locked"));
+    }, 1000);
+  }
+
+  const ROGUE_BUFF_INTERVAL = 10;
+
+  function startRogueTimerLoop(){
+    clearInterval(rogueTimerId);
+    rogueTimerId = setInterval(()=>{
+      rogueTimeLeft--;
+      rogueElapsed++;
+      if(rogueTimeLeft <= 0){
+        endRogueRun();
+        return;
+      }
+      if(rogueElapsed % rogueDiff.interval === 0){
+        updateRogueUI();
+        showBuffChoice();
+        return;
+      }
+      if(rogueAutoPerSec > 0){
+        rogueScore += rogueAutoPerSec;
+      }
+      updateRogueUI();
+    }, 1000);
+  }
+
+  function startRogueRun(){
+    rogueActive = false;
+    roguePaused = false;
+    rogueScore = 0;
+    rogueClickPower = 1;
+    rogueCritBonus = 0;
+    rogueAutoPerSec = 0;
+    rogueDoubleChance = 0;
+    rogueCritMult = 5;
+    rogueTimeLeft = rogueDiff.duration;
+    rogueElapsed = 0;
+    document.getElementById("rogueDiffTag").textContent = rogueDiff.name;
+    rogueTaken = new Set();
+    rogueSynergyDone = new Set();
+    synergyToastEl.classList.remove("show");
+    runEndBoxEl.classList.remove("show");
+    buffOverlayEl.classList.remove("show");
+    updateRogueUI();
+    showStartingPerkChoice();
+  }
+
+  function endRogueRun(){
+    clearInterval(rogueTimerId);
+    rogueActive = false;
+    roguePaused = false;
+    const reward = Math.floor(rogueScore * 0.1 * rogueDiff.reward);
+    state.score += reward;
+    state.total += reward;
+    state.rogueRunsPlayed = (state.rogueRunsPlayed||0) + 1;
+    if(rogueScore > (state.rogueBest||0)) state.rogueBest = rogueScore;
+    if(!state.rogueBestDiff) state.rogueBestDiff = {};
+    if(rogueScore > (state.rogueBestDiff[rogueDiff.id]||0)) state.rogueBestDiff[rogueDiff.id] = rogueScore;
+    checkAch();
+    renderAch();
+    save();
+    updateRogueUI();
+    runEndTextEl.textContent = `[${rogueDiff.name}] 획득 점수 ${fmt(rogueScore)} → 일반 모드에 +${fmt(reward)}점 (이 난이도 최고 ${fmt(state.rogueBestDiff[rogueDiff.id])})${rogueSynergyDone.size>0 ? ` · 시너지 ${rogueSynergyDone.size}개` : ""}`;
+    runEndBoxEl.classList.add("show");
+    const runEndBtnEl = document.getElementById("runEndBtn");
+    runEndBtnEl.disabled = true;
+    runEndBtnEl.style.opacity = ".45";
+    setTimeout(()=>{ runEndBtnEl.disabled = false; runEndBtnEl.style.opacity = ""; }, 1000);
+    beep(500,.2,"triangle",.07);
+  }
+
+  runEndBoxEl.querySelector("#runEndBtn").addEventListener("click", ()=>{
+    runEndBoxEl.classList.remove("show");
+    showMainMenu();
+  });
+
+  function handleRogueTouch(){
+    if(!rogueActive || roguePaused || Date.now() < rogueGraceUntil) return;
+    if(state.vibrate && navigator.vibrate) navigator.vibrate(8);
+    const isCrit = Math.random() < (0.12 + rogueCritBonus);
+    const isDouble = rogueDoubleChance > 0 && Math.random() < rogueDoubleChance;
+    let amount = rogueClickPower;
+    if(isCrit) amount *= rogueCritMult;
+    if(isDouble) amount *= 2;
+    rogueScore += amount;
+    const rect = rogueTouchBtn.getBoundingClientRect();
+    const cx = rect.width/2, cy = rect.height/2;
+    spawnFloat(cx + (Math.random()*36-18), rect.height*0.22, amount, isCrit?"crit":null, rogueTouchWrapEl);
+    spawnSparks(cx, cy, rogueTouchWrapEl);
+    beep(isCrit?820:480, isCrit?0.12:0.05, isCrit?"square":"sine", isCrit?0.07:0.045);
+    updateRogueUI();
+  }
+  rogueTouchBtn.addEventListener("click", handleRogueTouch);
+
+  load();
+  applySettings();
+  updateMenuStats();
+  updateMissionBadge();
+  if(!state.tutorialDone && (state.totalClicks||0) > 0) state.tutorialDone = true;
+  initMonster();
+  initLeaderboard();
+  checkForUpdate();
+  renderShop();
+  renderAch();
+  renderPrestige();
+  renderStats();
+  renderMission();
+  applySkin();
+  renderSkins();
+  updateUI();
+
+  function showOfflineEarnings(){
+    if(!state.lastSave) return;
+    const elapsedSec = Math.floor((Date.now() - state.lastSave)/1000);
+    const CAP_SEC = 8*3600;
+    const usedSec = Math.max(0, Math.min(elapsedSec, CAP_SEC));
+    if(usedSec < 30 || state.autoPerSec <= 0) return;
+    const earned = Math.round(effAuto() * usedSec * 0.5);
+    if(earned <= 0) return;
+    state.score += earned;
+    state.total += earned;
+    updateUI(); renderShop(); checkAch(); renderPrestige(); renderStats(); save();
+    prestigeToastEl.textContent = `💤 자리 비운 사이 +${fmt(earned)} 획득!`;
+    prestigeToastEl.classList.remove("hide");
+    prestigeToastEl.classList.add("show");
+    setTimeout(()=>{
+      prestigeToastEl.classList.remove("show");
+      prestigeToastEl.classList.add("hide");
+    }, 2400);
+  }
+  showOfflineEarnings();
+
+  function sizeTouchWrap(){
+    const wrap = document.getElementById("touchWrap");
+    const centerArea = document.querySelector(".centerArea");
+    const comboH = comboEl.offsetHeight;
+    const scoreH = scoreEl.offsetHeight;
+    const rateH = rateEl.offsetHeight;
+    const monsterH = (document.getElementById("monsterBox") || {offsetHeight:0}).offsetHeight + 8;
+    const availH = centerArea.clientHeight - comboH - scoreH - rateH - monsterH - 50;
+    const availW = centerArea.clientWidth - 20;
+    const size = Math.max(70, Math.min(availH, availW, 180));
+    wrap.style.width = size + "px";
+    wrap.style.height = size + "px";
+  }
+  window.addEventListener("load", sizeTouchWrap);
+  window.addEventListener("resize", sizeTouchWrap);
+  sizeTouchWrap();
+  setTimeout(sizeTouchWrap, 50);
+  setTimeout(sizeTouchWrap, 300);
+
+})();
+</script>
+</body>
+</html>
